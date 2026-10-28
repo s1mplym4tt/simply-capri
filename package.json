@@ -69,9 +69,6 @@
       "artifactName": "Simply-Capri-Setup-${version}.${ext}"
     }
   },
-  "files": [
-    "integrations/**"
-  ],
   "contributors": [
     {
       "name": "s1mplym4tt",
