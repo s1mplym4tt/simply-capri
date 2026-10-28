@@ -149,10 +149,38 @@ button.link { border: 0; padding: 0; background: none; color: var(--accent-2); t
 .footer .note { margin: 0; }
 .footer-actions { display: flex; gap: 10px; }
 
+.list { display: grid; gap: 8px; }
+.credential-row,
+.path-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.credential-row:last-child,
+.path-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.credential-name,
+.path-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.credential-name strong,
+.path-copy strong { color: var(--ink); }
+.credential-name small,
+.path-copy code {
+  color: var(--muted);
+  font: 11px/1.4 "JetBrains Mono", ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.path-copy code { background: transparent; border: 0; padding: 0; }
+.row-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+button.small { padding: 7px 11px; font-size: 12px; }
+.empty { color: var(--muted); font-style: italic; }
+
 @media (max-width: 720px) {
   .top, main, .credit { padding-left: 18px; padding-right: 18px; }
   .credit { margin-left: 18px; margin-right: 18px; }
   .row { flex-direction: column; align-items: stretch; }
   .row > button { margin-bottom: 0; }
+  .credential-row, .path-row { align-items: flex-start; flex-direction: column; }
   .footer { padding: 12px 18px; }
 }

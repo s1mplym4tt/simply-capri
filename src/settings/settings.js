@@ -69,6 +69,63 @@ function syncProviderUi() {
     : 'stored keys are never shown again';
 }
 
+function fillStoredKeys(data) {
+  const wrap = $('stored-keys');
+  wrap.replaceChildren();
+  const keys = data.config?.keys || [];
+  setBadge('credentials-badge', keys.length ? `${keys.length} stored` : 'none', keys.length ? 'ok' : '');
+  if (!keys.length) {
+    const empty = document.createElement('p');
+    empty.className = 'note empty';
+    empty.textContent = 'No API keys stored yet.';
+    wrap.append(empty);
+    return;
+  }
+  const providers = new Map((data.providers || []).map((p) => [p.id, p.label]));
+  for (const id of keys) {
+    const row = document.createElement('div');
+    row.className = 'credential-row';
+    const name = document.createElement('div');
+    name.className = 'credential-name';
+    const title = document.createElement('strong');
+    title.textContent = providers.get(id) || id;
+    const meta = document.createElement('small');
+    meta.textContent = 'encrypted key stored · value hidden';
+    name.append(title, meta);
+    const button = document.createElement('button');
+    button.className = 'secondary small';
+    button.textContent = 'Clear';
+    button.addEventListener('click', () => clearKey(id, providers.get(id) || id));
+    row.append(name, button);
+    wrap.append(row);
+  }
+}
+
+function fillPaths(paths) {
+  const ids = {
+    claude: 'claude-path',
+    appData: 'appdata-path',
+    sounds: 'sounds-path',
+    captures: 'captures-path',
+    ha: 'ha-path',
+  };
+  for (const [key, id] of Object.entries(ids)) {
+    $(id).textContent = paths?.[key] || '—';
+  }
+}
+
+function fillHa(ha) {
+  $('haUrl').value = ha.url || '';
+  $('haToken').value = '';
+  $('clearHaToken').checked = false;
+  $('ha-token-hint').textContent = ha.tokenStored
+    ? 'a token is stored; leave blank to keep it'
+    : 'not set';
+  for (const id of ['haUrl', 'haToken', 'clearHaToken', 'saveHa']) {
+    $(id).disabled = !ha.supported;
+  }
+}
+
 function populate(data) {
   snapshot = data;
   models = data.models || [];
@@ -94,6 +151,9 @@ function populate(data) {
     : 'The Caelestia / Home Assistant add-on is only available on Linux with KDE.';
   $('installHa').disabled = !ha.supported || !ha.available;
   $('openHa').disabled = !ha.supported;
+  fillStoredKeys(data);
+  fillPaths(data.paths || {});
+  fillHa(ha);
 
   setBadge('connection-badge', data.chatError ? 'error' : 'ready', data.chatError ? 'bad' : 'ok');
   setConnection(data.chatError || `${data.provider || data.config.provider} · ${data.model || 'no model selected'} · ${models.length} model${models.length === 1 ? '' : 's'}`, data.chatError ? 'warn' : '');
@@ -145,6 +205,68 @@ async function save() {
   }
 }
 
+async function clearKey(provider, label) {
+  if (!window.confirm(`Clear the stored key for ${label}?`)) return;
+  setStatus(`Clearing key for ${label}…`);
+  try {
+    const result = await api.clearKey(provider);
+    if (!result.ok) {
+      setStatus(result.error || 'Could not clear key', 'bad');
+      return;
+    }
+    if (result.snapshot) populate(result.snapshot);
+    setStatus(result.warning || 'Stored key cleared.', result.warning ? 'warn' : 'ok');
+  } catch (err) {
+    setStatus(`Could not clear key: ${err.message}`, 'bad');
+  }
+}
+
+async function pickClaude() {
+  setStatus('Choosing Claude Code folder…');
+  try {
+    const result = await api.pickClaude();
+    if (!result.ok) {
+      if (!result.canceled) setStatus(result.error || 'Could not choose folder', 'bad');
+      return;
+    }
+    if (result.snapshot) populate(result.snapshot);
+    setStatus('Claude Code folder saved.', 'ok');
+  } catch (err) {
+    setStatus(`Could not choose folder: ${err.message}`, 'bad');
+  }
+}
+
+async function openPath(kind) {
+  try {
+    const result = await api.openPath(kind);
+    if (!result.ok) setStatus(result.error || 'Could not open folder', 'bad');
+  } catch (err) {
+    setStatus(`Could not open folder: ${err.message}`, 'bad');
+  }
+}
+
+async function saveHa() {
+  setStatus('Saving Home Assistant connection…');
+  $('saveHa').disabled = true;
+  try {
+    const result = await api.saveHa({
+      url: $('haUrl').value.trim(),
+      token: $('haToken').value,
+      clearToken: $('clearHaToken').checked,
+    });
+    if (!result.ok) {
+      setStatus(result.error || 'Could not save Home Assistant connection', 'bad');
+      return;
+    }
+    if (result.snapshot) populate(result.snapshot);
+    setStatus('Home Assistant connection saved. Reload Caelestia to apply it.', 'ok');
+  } catch (err) {
+    setStatus(`Could not save Home Assistant connection: ${err.message}`, 'bad');
+  } finally {
+    $('saveHa').disabled = !snapshot?.ha?.supported;
+  }
+}
+
 async function refresh() {
   setStatus('Checking provider…');
   $('refresh').disabled = true;
@@ -185,8 +307,13 @@ $('temperature').addEventListener('input', () => {
 });
 $('save').addEventListener('click', save);
 $('refresh').addEventListener('click', refresh);
+$('saveHa').addEventListener('click', saveHa);
+$('pickClaude').addEventListener('click', pickClaude);
 $('installHa').addEventListener('click', installHa);
 $('openHa').addEventListener('click', () => api.openHa());
+document.querySelectorAll('[data-open-path]').forEach((button) => {
+  button.addEventListener('click', () => openPath(button.dataset.openPath));
+});
 $('close').addEventListener('click', () => api.close());
 $('upstream').addEventListener('click', () => api.openExternal('https://github.com/mochiiwuff/capri-desktop'));
 

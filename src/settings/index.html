@@ -67,7 +67,19 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">02 // GENERATION</p>
+          <p class="eyebrow">02 // CREDENTIALS</p>
+          <h2>Stored credentials</h2>
+        </div>
+        <span id="credentials-badge" class="badge">checking</span>
+      </div>
+      <div id="stored-keys" class="list"></div>
+      <p class="note">API keys are encrypted with your operating system keychain and are never sent back to this window. Add or replace one with the field above.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">03 // GENERATION</p>
           <h2>How she answers</h2>
         </div>
       </div>
@@ -94,7 +106,7 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">03 // MIND</p>
+          <p class="eyebrow">04 // MIND</p>
           <h2>Thoughts and questions</h2>
         </div>
       </div>
@@ -123,7 +135,42 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">04 // CAELESTIA</p>
+          <p class="eyebrow">05 // PATHS</p>
+          <h2>Folders</h2>
+        </div>
+      </div>
+      <div class="path-list">
+        <div class="path-row">
+          <div class="path-copy"><strong>Claude Code working folder</strong><code id="claude-path"></code></div>
+          <div class="row-buttons">
+            <button id="pickClaude" class="secondary small">Choose</button>
+            <button class="secondary small" data-open-path="claude">Open</button>
+          </div>
+        </div>
+        <div class="path-row">
+          <div class="path-copy"><strong>App data</strong><code id="appdata-path"></code></div>
+          <button class="secondary small" data-open-path="appData">Open</button>
+        </div>
+        <div class="path-row">
+          <div class="path-copy"><strong>Custom sounds</strong><code id="sounds-path"></code></div>
+          <button class="secondary small" data-open-path="sounds">Open</button>
+        </div>
+        <div class="path-row">
+          <div class="path-copy"><strong>Captures</strong><code id="captures-path"></code></div>
+          <button class="secondary small" data-open-path="captures">Open</button>
+        </div>
+        <div class="path-row">
+          <div class="path-copy"><strong>Caelestia add-on</strong><code id="ha-path"></code></div>
+          <button class="secondary small" data-open-path="ha">Open</button>
+        </div>
+      </div>
+      <p class="note">These are local paths. They are not published with the source code.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">06 // CAELESTIA</p>
           <h2>Home Assistant + mood add-on</h2>
         </div>
         <span id="ha-badge" class="badge">unknown</span>
@@ -131,19 +178,36 @@
 
       <p class="note" id="ha-note"></p>
 
+      <label class="field">
+        <span>Home Assistant URL</span>
+        <input id="haUrl" type="url" placeholder="http://homeassistant.local:8123">
+      </label>
+
+      <label class="field">
+        <span>Access token <small id="ha-token-hint">not set</small></span>
+        <input id="haToken" type="password" autocomplete="off" placeholder="Paste a long-lived access token, or leave blank">
+      </label>
+
+      <label class="checkline">
+        <input id="clearHaToken" type="checkbox">
+        <span>Clear the stored Home Assistant token</span>
+      </label>
+
       <div class="row">
+        <button id="saveHa" class="secondary">Save HA connection</button>
         <button id="installHa" class="primary">Install / update add-on</button>
         <button id="openHa" class="secondary">Open add-on folder</button>
       </div>
 
       <p class="note">
         The add-on lives in the Home Assistant widget and shows Capri's real sxndrxnx
-        mood bars beneath today's energy consumption. It is Linux/KDE only.
+        mood bars beneath today's energy consumption. It is Linux/KDE only. The HA token
+        stays in the add-on's local config.json, not in this repository.
       </p>
     </section>
 
     <section class="card about">
-      <p class="eyebrow">05 // CREDITS</p>
+      <p class="eyebrow">07 // CREDITS</p>
       <h2>Simply Capri · built on Capri Desktop</h2>
       <p>
         Original Capri Desktop by <strong>mochiiwuff</strong> ·

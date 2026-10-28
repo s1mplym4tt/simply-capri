@@ -23,9 +23,11 @@ Open **Settings…** from her tray menu (or run `npm start -- --settings`). The 
 
 - provider selection: OpenAI-compatible / OpenCode / local servers, DeepSeek, OpenAI, OpenRouter, Groq, Gemini, Mistral, Ollama, Claude Code;
 - base URL, encrypted API key, model and connection refresh;
+- a stored-credentials overview (secrets stay hidden) and per-provider key clearing;
 - temperature, max tokens and top-p;
 - random idle thoughts and questions, with their intervals;
-- installing the Caelestia Home Assistant add-on (Linux/KDE) with Capri's live mood bars.
+- local folder shortcuts (Claude Code working folder, app data, custom sounds, captures);
+- Home Assistant URL and access token, plus installing the Caelestia add-on (Linux/KDE) with Capri's live mood bars.
 
 The settings window is cross-platform. The Caelestia add-on is Linux/KDE-only; on Windows the
 desktop app, chat, provider setup, generation controls, thoughts/questions and the original

@@ -1041,10 +1041,11 @@ function llmConfig(cfg = config.load()) {
 
 async function pickClaudeFolder() {
   const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'], defaultPath: config.load().claudeCwd || app.getPath('home') });
-  if (canceled || !filePaths[0]) return;
+  if (canceled || !filePaths[0]) return null;
   llm.resetClaude(); // a new folder, a new Claude Code conversation (hers goes on)
   saveMemory({ claude: null });
   updateConfig({ claudeCwd: filePaths[0] });
+  return filePaths[0];
 }
 
 function haPaths() {
@@ -1057,22 +1058,52 @@ function haPaths() {
   };
 }
 
+function readHaConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(haPaths().target, 'config.json'), 'utf8')) || {};
+  } catch {
+    return {};
+  }
+}
+
+function settingsPath(kind) {
+  switch (kind) {
+    case 'claude': return config.load().claudeCwd || app.getPath('home');
+    case 'appData': return app.getPath('userData');
+    case 'sounds': return userSoundsDir();
+    case 'captures': return path.join(app.getPath('userData'), 'captures');
+    case 'ha': return haPaths().target;
+    default: return null;
+  }
+}
+
 function settingsSnapshot() {
   const cfg = config.load();
   const { apiKeys, ...rest } = cfg;
   const paths = haPaths();
+  const haConfig = readHaConfig();
   return {
     config: { ...rest, keys: Object.keys(apiKeys || {}) },
     providers: Object.entries(llm.PROVIDERS).map(([id, p]) => ({ id, label: p.label, local: Boolean(p.local) })),
     models: chatModels || [],
     model: pickModel(cfg),
     chatError,
+    paths: {
+      claude: settingsPath('claude'),
+      appData: settingsPath('appData'),
+      sounds: settingsPath('sounds'),
+      captures: settingsPath('captures'),
+      ha: settingsPath('ha'),
+    },
     ha: {
       supported: process.platform === 'linux',
       source: paths.source,
       target: paths.target,
       available: fs.existsSync(paths.source),
       installed: fs.existsSync(paths.target),
+      url: haConfig.url || '',
+      tokenStored: Boolean(haConfig.token),
+      configFile: path.join(paths.target, 'config.json'),
     },
     platform: process.platform,
     version: app.getVersion(),
@@ -1164,6 +1195,36 @@ function registerIpc() {
   });
   ipcMain.handle('config:get', () => rendererConfig());
   ipcMain.handle('settings:get', () => settingsSnapshot());
+  ipcMain.handle('settings:clear-key', async (_e, provider) => {
+    const id = String(provider || '');
+    if (!llm.PROVIDERS[id]) return { ok: false, error: 'Unknown provider' };
+    const keys = { ...(config.load().apiKeys || {}) };
+    if (!keys[id]) return { ok: true, snapshot: settingsSnapshot() };
+    delete keys[id];
+    config.save({ apiKeys: keys });
+    const models = await refreshModels();
+    updateConfig({});
+    return {
+      ok: true,
+      warning: models && models.length ? null : (chatError || 'No models found — check the URL or key'),
+      snapshot: settingsSnapshot(),
+    };
+  });
+  ipcMain.handle('settings:pick-claude', async () => {
+    const dir = await pickClaudeFolder();
+    return dir ? { ok: true, path: dir, snapshot: settingsSnapshot() } : { ok: false, canceled: true };
+  });
+  ipcMain.handle('settings:open-path', async (_e, kind) => {
+    const dir = settingsPath(String(kind || ''));
+    if (!dir) return { ok: false, error: 'Unknown folder' };
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const error = await shell.openPath(dir);
+      return error ? { ok: false, error, path: dir } : { ok: true, path: dir };
+    } catch (err) {
+      return { ok: false, error: err.message, path: dir };
+    }
+  });
   ipcMain.handle('settings:refresh', async () => {
     const models = await refreshModels();
     return { ok: Boolean(models?.length), models: models || [], error: chatError, model: pickModel() };
@@ -1209,6 +1270,22 @@ function registerIpc() {
       model: pickModel(),
       snapshot: settingsSnapshot(),
     };
+  });
+  ipcMain.handle('settings:save-ha', (_e, data = {}) => {
+    if (process.platform !== 'linux') return { ok: false, error: 'The Caelestia add-on is Linux/KDE only' };
+    const { target } = haPaths();
+    try {
+      fs.mkdirSync(target, { recursive: true });
+      const current = readHaConfig();
+      const next = { ...current };
+      if (data.url !== undefined && String(data.url).trim()) next.url = String(data.url).trim();
+      if (data.clearToken) delete next.token;
+      if (data.token !== undefined && String(data.token).trim()) next.token = String(data.token).trim();
+      fs.writeFileSync(path.join(target, 'config.json'), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+      return { ok: true, snapshot: settingsSnapshot() };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   });
   ipcMain.handle('settings:install-ha', () => {
     if (process.platform !== 'linux') return { ok: false, error: 'The Caelestia add-on is Linux/KDE only' };
