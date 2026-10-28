@@ -631,6 +631,7 @@ html[data-motion='reduced'] .panel__bar {
 /* ---------- talking to her (chat) ---------- */
 
 .panel[data-kind='chat'] { --accent: var(--green); }
+.panel.is-desktop { --accent: var(--blue); }
 
 .panel.is-chat {
   width: clamp(320px, 24vw, 420px);

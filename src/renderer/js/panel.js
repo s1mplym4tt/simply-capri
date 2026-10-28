@@ -72,6 +72,9 @@ export class Panel {
       this.chatInput.value = '';
       this.current?.onSend?.(text);
     });
+    // Don't let a hold timer close the card while you're answering it.
+    this.chatInput.addEventListener('focus', () => clearTimeout(this.hideTimer));
+    this.chatInput.addEventListener('input', () => clearTimeout(this.hideTimer));
     this.chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.hide();
     });
@@ -117,7 +120,7 @@ export class Panel {
     // nor on a chat with her: only a permission prompt breaks in; Claude finishing waits until after
     // (even while she teleports and the panel is put aside for a moment). Her setup's panels with a
     // line to type in (a key) aren't a chat: its next step follows them.
-    if (cur?.chat && !cur.guide && !this.el.hidden && !this.leaving && PRIORITY[msg.kind] < 4) {
+    if (cur?.chat && !cur.guide && !cur.quick && !this.el.hidden && !this.leaving && PRIORITY[msg.kind] < 4) {
       if (PRIORITY[msg.kind] >= 3) this.missed = { ...msg, missedAt: performance.now() };
       return false;
     }
@@ -139,6 +142,7 @@ export class Panel {
     this.el.classList.toggle('has-reply', Boolean(msg.reply));
     this.el.classList.toggle('has-report', Boolean(msg.report));
     this.el.classList.toggle('is-guide', Boolean(msg.guide));
+    this.el.classList.toggle('is-desktop', Boolean(msg.desktop));
     this.renderReport(msg.report);
     this.renderActions(msg.actions, msg.onAction);
     this.renderChat(msg.chat);

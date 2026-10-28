@@ -5,6 +5,7 @@
 // Spotify and most players), a Spotify search, or a website. Windows only.
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawn, execFile } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
@@ -12,6 +13,24 @@ const { app, shell } = require('electron');
 const { powershell } = require('./apps');
 
 const WIN = process.platform === 'win32';
+const LINUX = process.platform === 'linux';
+
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { timeout: 4000 }, (err, out) => (err ? reject(err) : resolve(String(out || '').trim())));
+  });
+}
+
+async function mprisPlayer() {
+  try {
+    const out = await run('bash', ['-lc', "busctl --user list --no-legend 2>/dev/null | awk '/org.mpris.MediaPlayer2/ {print $1}'"]);
+    const players = String(out || '').split(/\n/).filter(Boolean);
+    const preferred = players.find((name) => /spotify|chromium|chrome|firefox|mpv|vlc|rhythmbox|elisa|lollypop/i.test(name));
+    return preferred || players[0] || null;
+  } catch {
+    return null;
+  }
+}
 // not things to open from a chat: uninstallers, help pages and the like
 const SKIP = /uninstall|désinstaller|desinstalar|deinstall|readme|documentation|release notes|support center|website|manual/i;
 const STEAM_SKIP = /redistributable|dedicated server|steamworks/i;
@@ -25,8 +44,54 @@ const plain = (text) => String(text || '').toLowerCase().normalize('NFKD').repla
 const words = (text) => plain(text).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
 
 // Everything she can open: [{ name, kind: 'app' | 'steam' | 'epic', id }]
+function linuxDesktopEntries() {
+  const dirs = [
+    path.join(os.homedir(), '.local', 'share', 'applications'),
+    '/usr/local/share/applications',
+    '/usr/share/applications',
+    '/var/lib/flatpak/exports/share/applications',
+    path.join(os.homedir(), '.local', 'share', 'flatpak', 'exports', 'share', 'applications'),
+  ];
+  const seen = new Set();
+  const items = [];
+  for (const dir of dirs) {
+    let files = [];
+    try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.desktop')); } catch { continue; }
+    for (const file of files) {
+      const id = file.slice(0, -'.desktop'.length);
+      if (seen.has(id)) continue;
+      try {
+        const text = fs.readFileSync(path.join(dir, file), 'utf8');
+        let inEntry = false;
+        let name = '';
+        let noDisplay = false;
+        let terminal = false;
+        for (const raw of text.split('\n')) {
+          const line = raw.trim();
+          if (line.startsWith('[')) { inEntry = line === '[Desktop Entry]'; continue; }
+          if (!inEntry) continue;
+          if (line.startsWith('Name=') && !name) name = line.slice(5).trim();
+          if (line === 'NoDisplay=true') noDisplay = true;
+          if (line === 'Terminal=true') terminal = true;
+        }
+        if (!name || noDisplay || terminal || SKIP.test(name)) continue;
+        seen.add(id);
+        items.push({ name, kind: 'desktop', id });
+      } catch {
+        // a desktop entry being written, or unreadable
+      }
+    }
+  }
+  return items;
+}
+
 async function launchables() {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.items;
+  if (LINUX) {
+    const items = linuxDesktopEntries();
+    cache = { at: Date.now(), items };
+    return items;
+  }
   if (!WIN) return [];
   const items = [];
   const seen = new Set();
@@ -201,6 +266,10 @@ async function launch({ kind, id } = {}) {
   if (!item) throw new Error('not found');
   if (kind === 'steam') return shell.openExternal(`steam://rungameid/${id}`);
   if (kind === 'epic') return shell.openExternal(`com.epicgames.launcher://apps/${encodeURIComponent(id)}?action=launch&silent=true`);
+  if (kind === 'desktop' && LINUX) {
+    await run('gtk-launch', [id]);
+    return undefined;
+  }
   spawn('explorer.exe', [`shell:AppsFolder\\${id}`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
   return undefined;
 }
@@ -213,6 +282,28 @@ const KEY_DOWN = 1; // KEYEVENTF_EXTENDEDKEY
 const KEY_UP = 3;   // ...and KEYEVENTF_KEYUP
 
 async function media(action) {
+  if (LINUX) {
+    try {
+      if (action === 'volup' || action === 'voldown') {
+        await run('wpctl', ['set-volume', '@DEFAULT_AUDIO_SINK@', action === 'volup' ? '5%+' : '5%-']);
+        return true;
+      }
+      if (action === 'mute') {
+        await run('wpctl', ['set-mute', '@DEFAULT_AUDIO_SINK@', 'toggle']);
+        return true;
+      }
+      const method = { pause: 'PlayPause', play: 'PlayPause', next: 'Next', previous: 'Previous' }[action];
+      if (!method) return false;
+      const player = await mprisPlayer();
+      if (!player) return false;
+      await run('gdbus', ['call', '--session', '--dest', player,
+        '--object-path', '/org/mpris/MediaPlayer2',
+        '--method', `org.mpris.MediaPlayer2.Player.${method}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   if (!WIN || !MEDIA[action]) return false;
   const [key, times] = MEDIA[action];
   return powershell(
@@ -221,15 +312,128 @@ async function media(action) {
   ).then(() => true, () => false);
 }
 
-// A Spotify search for it: in the app if it's installed, else on the web.
+// Resolve the query to a Spotify track ID through public search results. The
+// desktop app can then play the track itself instead of stopping at a search
+// page. Best effort: if search cannot resolve it, we fall back to the search.
+async function spotifyTrackId(query) {
+  const q = String(query || '').trim();
+  if (!q) return null;
+  try {
+    const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:open.spotify.com/track ${q}`);
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36' },
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return null;
+    const body = await res.text();
+    const ids = [...body.matchAll(/open\.spotify\.com\/track\/([A-Za-z0-9]{10,})/g)].map((m) => m[1]);
+    return ids[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function spotifyIdFromLink(text) {
+  const match = /(?:spotify:track:|open\.spotify\.com\/track\/)([A-Za-z0-9]{10,})/i.exec(String(text || ''));
+  return match ? match[1] : null;
+}
+
+// Spotify's desktop search keeps the query in the search field. Down selects
+// the first result and Enter starts it. This is the reliable fallback when
+// public search can't resolve a track id.
+async function spotifyPlaying() {
+  try {
+    const out = await run('gdbus', ['call', '--session', '--dest', 'org.mpris.MediaPlayer2.spotify',
+      '--object-path', '/org/mpris/MediaPlayer2',
+      '--method', 'org.freedesktop.DBus.Properties.Get',
+      'org.mpris.MediaPlayer2.Player', 'PlaybackStatus']);
+    return out.includes('Playing');
+  } catch {
+    return false;
+  }
+}
+
+async function spotifyWindow() {
+  const ids = String(await run('xdotool', ['search', '--class', '^spotify$'])).split(/\s+/).filter(Boolean);
+  let best = null;
+  let bestArea = 0;
+  for (const id of ids) {
+    try {
+      const info = await run('xdotool', ['getwindowgeometry', '--shell', id]);
+      const width = Number((/WIDTH=(\d+)/.exec(info) || [])[1] || 0);
+      const height = Number((/HEIGHT=(\d+)/.exec(info) || [])[1] || 0);
+      const area = width * height;
+      if (area > bestArea) {
+        best = id;
+        bestArea = area;
+      }
+    } catch {
+      // a helper window went away
+    }
+  }
+  return best;
+}
+
+async function playFirstSpotifyResult(query) {
+  const q = String(query || '').trim();
+  if (!q) return false;
+  try {
+    // Stop whatever was playing first: otherwise a still-playing old track
+    // looks like success after the search and we skip the final Space.
+    if (await spotifyPlaying()) {
+      await run('gdbus', ['call', '--session', '--dest', 'org.mpris.MediaPlayer2.spotify',
+        '--object-path', '/org/mpris/MediaPlayer2',
+        '--method', 'org.mpris.MediaPlayer2.Player.PlayPause']);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await shell.openExternal(`spotify:search:${encodeURIComponent(q)}`);
+    await new Promise((resolve) => setTimeout(resolve, 2200));
+    const id = await spotifyWindow();
+    if (!id) return true; // the search still opened; no desktop window to drive
+    await run('xdotool', ['windowactivate', id]);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Put the query into the actual search box. Relying on the URI alone left
+    // the focus/selection wherever Spotify was last, which played the wrong
+    // row (or nothing).
+    await run('xdotool', ['key', 'ctrl+k']);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await run('xdotool', ['key', 'ctrl+a']);
+    await run('xdotool', ['type', '--delay', '25', q]);
+    await run('xdotool', ['key', 'Return']);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Select the top result; this may start it or open its track page.
+    await run('xdotool', ['key', 'Down', 'Return']);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    // If it only opened the track page, Space starts it. Do not Space when the
+    // Return already started playback, or we would immediately pause it.
+    if (!(await spotifyPlaying())) {
+      await run('xdotool', ['key', 'space']);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// A Spotify track: a pasted link/URI plays exactly; otherwise resolve a track
+// id, and finally fall back to the desktop search + first-result playback.
 async function music(query) {
   const q = String(query || '').trim().slice(0, 200);
   if (!q) return false;
-  try {
-    await shell.openExternal(`spotify:search:${encodeURIComponent(q)}`);
-  } catch {
-    await shell.openExternal(`https://open.spotify.com/search/${encodeURIComponent(q)}`);
+  const direct = spotifyIdFromLink(q);
+  if (direct) {
+    try {
+      await shell.openExternal(`spotify:track:${direct}`);
+      return true;
+    } catch {
+      // fall through
+    }
   }
+  if (LINUX && await playFirstSpotifyResult(q)) return true;
+  try {
+    await shell.openExternal(`https://open.spotify.com/search/${encodeURIComponent(q)}`);
+  } catch {}
   return true;
 }
 

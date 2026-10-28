@@ -24,7 +24,7 @@ const PROVIDERS = {
   gemini: { label: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai', env: 'GEMINI_API_KEY' },
   deepseek: { label: 'DeepSeek', url: 'https://api.deepseek.com/v1', env: 'DEEPSEEK_API_KEY' },
   mistral: { label: 'Mistral', url: 'https://api.mistral.ai/v1', env: 'MISTRAL_API_KEY' },
-  custom: { label: 'Custom (customUrl in config)' },
+  custom: { label: 'OpenAI-compatible / OpenCode / custom' },
   claude: { label: 'Claude Code (sends to the terminal agent)', kind: 'claude' },
 };
 
@@ -88,11 +88,15 @@ function warm(id, model) {
 }
 
 // OpenAI-style streaming (server-sent events): onDelta(piece) as it comes, resolves with all of it.
-async function openaiChat(p, { model, messages }, onDelta, signal) {
+async function openaiChat(p, { model, messages, temperature, maxTokens, topP }, onDelta, signal) {
+  const body = { model, messages, stream: true };
+  if (Number.isFinite(temperature)) body.temperature = temperature;
+  if (Number.isFinite(maxTokens) && maxTokens > 0) body.max_tokens = maxTokens;
+  if (Number.isFinite(topP)) body.top_p = topP;
   const res = await fetch(`${p.url}/chat/completions`, {
     method: 'POST',
     headers: headers(p.key),
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) throw await failure(res);
@@ -212,7 +216,45 @@ async function chat(id, cfg, { model, messages }, onDelta, signal) {
   if (p.kind === 'ollama') return ollama.chat({ model, messages }, onDelta, signal);
   // Claude Code keeps its own memory of the conversation: only her persona and your last message go
   if (p.kind === 'claude') return claudeChat(cfg, messages.at(-1).content, messages[0].content, onDelta, signal);
-  return openaiChat(p, { model, messages }, onDelta, signal);
+  return openaiChat(p, {
+    model,
+    messages,
+    temperature: Number(cfg.temperature),
+    maxTokens: Number(cfg.maxTokens),
+    topP: Number(cfg.topP),
+  }, onDelta, signal);
+}
+
+// A transient desktop event: a login greeting or a click thought. The Capri
+// bridge answers these from the same shared persona/memory as Discord, but
+// deliberately does not add them to the transcript.
+async function desktopEvent(id, cfg, { kind, context } = {}) {
+  const p = endpoint(id, cfg);
+  if (id !== 'custom' || !p.url) throw new Error('desktop events need the Capri bridge');
+  const res = await fetch(`${p.url}/desktop/event`, {
+    method: 'POST',
+    headers: headers(p.key),
+    body: JSON.stringify({ kind, context }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw await failure(res);
+  const body = await res.json();
+  return String(body.text || '').trim();
+}
+
+// Add a line she just displayed to the shared transcript, without generating
+// another answer. This is what lets a later Discord reply continue from it.
+async function desktopCommit(id, cfg, text) {
+  const p = endpoint(id, cfg);
+  if (id !== 'custom' || !p.url) throw new Error('desktop lines need the Capri bridge');
+  const res = await fetch(`${p.url}/desktop/commit`, {
+    method: 'POST',
+    headers: headers(p.key),
+    body: JSON.stringify({ text: String(text || '') }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw await failure(res);
+  return res.json();
 }
 
 // Whether her answers stay on this PC: a server on this machine (and with Ollama, not a cloud model).
@@ -224,4 +266,4 @@ function isLocal(id, cfg, model) {
   return Boolean(PROVIDERS[id].local);
 }
 
-module.exports = { isLocal, PROVIDERS, CLAUDE_MODES, models, warm, chat, resetClaude, isChatSession, claudeMemory, restoreClaude };
+module.exports = { isLocal, PROVIDERS, CLAUDE_MODES, models, warm, chat, desktopEvent, desktopCommit, resetClaude, isChatSession, claudeMemory, restoreClaude };

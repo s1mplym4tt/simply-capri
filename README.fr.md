@@ -1,6 +1,12 @@
 [English](README.md) · **Français**
 
-# Capri
+# Simply Capri
+
+> **Fork :** Simply Capri est un fork de Capri Desktop, créé par **mochiiwuff**
+> (https://github.com/mochiiwuff/capri-desktop). Ce fork par **s1mplym4tt** ajoute le panneau de
+> réglages unifié, les contrôles de génération, les pensées/questions aléatoires, l'intégration
+> Linux/KDE, Spotify et l'add-on Home Assistant / Caelestia. Les droits sur le personnage et les
+> illustrations restent à leurs ayants droit.
 
 Capri, le construct du *Project Capricorn* (Cyberpunk: Edgerunners, saison 2), vit sur ton bureau
 et te raconte ce que fait ton IA de code, **Claude Code**, **Codex** ou **Antigravity** : elle se téléporte,
@@ -279,7 +285,7 @@ système. Tu peux en choisir une autre dans son menu.
 
 ### Démarrage rapide (Windows, sans coder)
 
-1. Télécharge **`Capri-Setup-x.y.z.exe`** dans la [dernière release](https://github.com/mochiiwuff/capri-desktop/releases/latest)
+1. Télécharge **`Capri-Setup-x.y.z.exe`** dans la [dernière release amont](https://github.com/mochiiwuff/capri-desktop/releases/latest)
    et lance-le. Il s'installe pour ton utilisateur seulement (pas besoin d'être administrateur), ajoute un raccourci
    sur le bureau et lance Capri. Pas besoin de Node.js ni de rien d'autre.
 2. L'installeur n'est pas signé (un certificat de signature, c'est payant), donc Windows SmartScreen peut afficher
@@ -305,8 +311,8 @@ s'endort. Tu peux juste la laisser là.
 Il faut [Node.js](https://nodejs.org) 20 ou plus.
 
 ```bash
-git clone https://github.com/mochiiwuff/capri-desktop.git
-cd capri-desktop
+git clone https://github.com/s1mplym4tt/simply-capri.git
+cd simply-capri
 npm install
 npm start
 ```

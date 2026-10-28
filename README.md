@@ -1,6 +1,13 @@
 **English** · [Français](README.fr.md)
 
-# Capri
+# Simply Capri
+
+> **Fork:** Simply Capri is a fork of Capri Desktop, created by **mochiiwuff** (https://github.com/mochiiwuff/capri-desktop).
+> This fork by **s1mplym4tt** adds a unified settings panel, API-provider and generation controls,
+> shared-memory desktop thoughts/questions, Linux/KDE integration, Spotify playback and the
+> Caelestia Home Assistant / mood add-on. Original artwork and character rights remain with their
+> respective holders.
+
 
 Capri, the *Project Capricorn* construct from Cyberpunk: Edgerunners season 2, lives on your desktop
 and tells you what your coding AI is up to: **Claude Code**, **Codex** or **Antigravity**. She teleports,
@@ -9,6 +16,29 @@ glitches, comments on every action, comes to find you when it needs your permiss
 ![Capri telling you Claude is done](docs/done.png)
 
 ![Teleport, frame by frame](docs/teleport.png)
+
+## Settings
+
+Open **Settings…** from her tray menu (or run `npm start -- --settings`). The window is one place for:
+
+- provider selection: OpenAI-compatible / OpenCode / local servers, DeepSeek, OpenAI, OpenRouter, Groq, Gemini, Mistral, Ollama, Claude Code;
+- base URL, encrypted API key, model and connection refresh;
+- temperature, max tokens and top-p;
+- random idle thoughts and questions, with their intervals;
+- installing the Caelestia Home Assistant add-on (Linux/KDE) with Capri's live mood bars.
+
+The settings window is cross-platform. The Caelestia add-on is Linux/KDE-only; on Windows the
+desktop app, chat, provider setup, generation controls, thoughts/questions and the original
+Windows-only window tracking remain available.
+
+## Architecture
+
+- `src/` — the Electron desktop app (this fork).
+- `integrations/caelestia/ha-widget/` — the optional Caelestia Home Assistant card, including Capri's live mood bars and return button.
+- `integrations/sxndrxnx/` — the bridge contract for the separate sxndrxnx bot. The bot is not vendored here.
+
+The desktop app works with any OpenAI-compatible provider. The shared-memory greeting,
+thought/question and mood features are active when the provider is the sxndrxnx bridge.
 
 ## What she does
 
@@ -264,9 +294,10 @@ own. You can choose another one in her menu.
 
 ### Quick start (Windows, no coding)
 
-1. Download **`Capri-Setup-x.y.z.exe`** from the [latest release](https://github.com/mochiiwuff/capri-desktop/releases/latest)
+1. Download **`Capri-Setup-x.y.z.exe`** from the [latest upstream release](https://github.com/mochiiwuff/capri-desktop/releases/latest)
    and run it. It installs for your user only (no admin rights), adds a desktop shortcut and starts Capri.
-   You don't need Node.js or anything else.
+   You don't need Node.js or anything else. (This fork builds its own installer as
+   **`Simply-Capri-Setup-x.y.z.exe`**.)
 2. The installer isn't signed (a code-signing certificate costs money), so Windows SmartScreen may say
    "Windows protected your PC": click **More info**, then **Run anyway**.
 3. Capri shows up and introduces herself. Click **Plug me in**: that connects her to Claude Code.
@@ -289,8 +320,8 @@ asleep. You can just leave her there.
 You need [Node.js](https://nodejs.org) 20 or newer.
 
 ```bash
-git clone https://github.com/mochiiwuff/capri-desktop.git
-cd capri-desktop
+git clone https://github.com/s1mplym4tt/simply-capri.git
+cd simply-capri
 npm install
 npm start
 ```

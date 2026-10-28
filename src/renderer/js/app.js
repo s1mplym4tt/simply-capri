@@ -88,11 +88,13 @@ async function boot() {
     fx,
     voice,
   });
+  capri.host = host;
   capri.wander = config.wander;
   capri.possessWindows = config.possess;
   capri.restOn = config.rest || 'corner';
   capri.setView(innerWidth, innerHeight, innerHeight - floorGap);
   capri.setScale(config.scale);
+  window.__capri = capri; // debug handle; harmless in production
 
   const mission = new Mission();
   const brain = new Brain({ capri, panel, voice, host, mission, lang: config.lang, assistant: config.assistant });
@@ -111,8 +113,9 @@ async function boot() {
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
     const onPanel = r && mouse.x >= r.left && mouse.x <= r.right && mouse.y >= r.top && mouse.y <= r.bottom;
-    document.body.style.cursor = onChip() ? 'pointer' : '';
-    return setInteractive(Boolean(onPanel || capri.hit(mouse.x, mouse.y) || onChip()));
+    const onHer = Boolean(mouse && capri.hit(mouse.x, mouse.y));
+    document.body.style.cursor = (onChip() || onHer) ? 'pointer' : '';
+    return setInteractive(Boolean(onPanel || onHer || onChip()));
   };
   // Her biochip: her eyes on it follow the pointer over it, and she comes out when you click it
   // (only then, so the pointer passing through that corner doesn't call her back).
@@ -148,6 +151,15 @@ async function boot() {
   });
   document.addEventListener('mouseleave', () => {
     mouse = null;
+    refreshHit();
+    hoverChip();
+  });
+  // Linux/X11: a click-through Electron window does not get forwarded mouse
+  // moves, so main.js polls the real cursor and sends it here. This is what
+  // lets her become interactive exactly while the pointer is on her.
+  host.onPointer(({ x, y, inside }) => {
+    lastMove = performance.now();
+    mouse = inside ? { x, y } : null;
     refreshHit();
     hoverChip();
   });
@@ -213,6 +225,36 @@ async function boot() {
     const lines = when === 'end' ? brain.t.uplink : brain.t.gaze;
     if (!panel.visible && Math.random() < (when === 'end' ? 0.6 : 0.4)) panel.say({ kind: 'info', line: pick(lines), hold: 3800 });
   };
+  // Tell the Caelestia bridge where the interactive parts are, so its
+  // full-screen drawer window can subtract a click-through hole there.
+  let lastHitBounds = '';
+  const publishHitBounds = () => {
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    const add = (el) => {
+      if (!el || el.hidden) return;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
+      left = Math.min(left, r.left); top = Math.min(top, r.top);
+      right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);
+    };
+    add(capri.canvas);
+    add(document.getElementById('chip'));
+    add(document.getElementById('mask'));
+    const pr = panel.rect();
+    if (pr) {
+      left = Math.min(left, pr.left); top = Math.min(top, pr.top);
+      right = Math.max(right, pr.right); bottom = Math.max(bottom, pr.bottom);
+    }
+    const bounds = Number.isFinite(left)
+      ? { x: Math.max(0, Math.floor(left) - 8), y: Math.max(0, Math.floor(top) - 8),
+          w: Math.ceil(right - left) + 16, h: Math.ceil(bottom - top) + 16 }
+      : { x: 0, y: 0, w: 0, h: 0 };
+    const key = JSON.stringify(bounds);
+    if (key === lastHitBounds) return;
+    lastHitBounds = key;
+    host.setBounds(bounds);
+  };
+  setInterval(publishHitBounds, 120);
   panel.onChar = (kind) => voice.play('blip', { mood: kind });
   panel.onTalk = (talking) => talking && capri.perform('talk');
   capri.onMenu = () => host.openMenu();
@@ -222,7 +264,26 @@ async function boot() {
   const guide = new Guide({ capri, panel, voice, host, brain });
   // Talking to her (chat.js): "Talk to her" in her menu, or the button when you click her idle.
   const chat = new Chat({ capri, panel, voice, host, brain });
+  capri.canJump = () => !panel.visible && !guide.running && !chat.open && !brain.busySessions.length;
   brain.onTalk = () => chat.start();
+  brain.onReply = (text) => chat.start(text);
+  host.chatStatus().then((status) => { brain.chatStatus = status; }).catch(() => {});
+  let lastUiState = '';
+  setInterval(() => {
+    const state = {
+      mode: capri.mode,
+      stance: capri.stance,
+      busy: capri.busy,
+      stowed: capri.stowed,
+      chatOpen: chat.open,
+      status: panel.current?.line || '',
+      connected: Boolean(brain.chatStatus?.ok && brain.chatStatus?.provider === 'custom'),
+    };
+    const key = JSON.stringify(state);
+    if (key === lastUiState) return;
+    lastUiState = key;
+    host.setState(state);
+  }, 500);
   // Getting her chat going with buttons (setup.js): Ollama and a model, a key, or an address
   const setup = new Setup({ guide, panel, host, brain, capri, voice });
   guide.setup = setup;
@@ -504,6 +565,10 @@ async function boot() {
   window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
+  // If her monitor gets a fullscreen app, take the overlay to a free monitor.
+  host.onFullscreen(({ on, return: back }) => {
+    if (on || back) capri.jumpScreen({ returnTo: Boolean(back), force: true });
+  });
   host.onWindows((data) => {
     capri.setWindows(data);
     brain.onWindows(data);
@@ -615,6 +680,10 @@ async function boot() {
       if (capri.mode === 'work' || capri.mode === 'alert') capri.setMode('idle');
     }
     brain.watching = cfg.claude !== false;
+    config.randomThoughts = cfg.randomThoughts !== false;
+    config.randomThoughtMinutes = Number(cfg.randomThoughtMinutes) || 15;
+    config.randomQuestions = cfg.randomQuestions === true;
+    config.randomQuestionMinutes = Number(cfg.randomQuestionMinutes) || 45;
     brain.custom = mine(cfg);
     brain.assistant = cfg.assistant;
     panel.labels = linesFor(cfg.lang, cfg.assistant);
@@ -635,6 +704,22 @@ async function boot() {
       case 'status':
         brain.status();
         break;
+      case 'jumpScreen': {
+        let tries = 0;
+        const go = async () => {
+          if (await capri.jumpScreen({ force: true }) || tries++ >= 5) return;
+          setTimeout(go, 800);
+        };
+        go();
+        break;
+      }
+      case 'mood': {
+        const mood = String(cmd.mood || 'idle');
+        if (mood === 'sleep') capri.setMode('sleep');
+        else if (mood === 'idle') capri.wake();
+        else if (['work', 'alert'].includes(mood)) capri.setMode(mood);
+        break;
+      }
       case 'customize': // "Make her yours" in her menu
         custom.open();
         break;
@@ -813,6 +898,55 @@ async function boot() {
   // her welcome: the first time, or while she's meant to watch Claude Code and isn't plugged into it
   if (!config.welcomed || (config.claude && !hooks.installed)) guide.welcome();
   else panel.say({ kind: 'info', line: brain.onlineLine(), hold: 4000 });
+
+  // A real login gets one greeting from the shared LLM, after her entrance and
+  // the static online line. App restarts in the same session stay quiet.
+  if (config.visible !== false) {
+    let tried = false;
+    let attempts = 0;
+    const tryGreet = async () => {
+      if (tried || config.visible === false || attempts++ > 10) return;
+      if (guide.running || panel.visible || capri.stowed) {
+        setTimeout(tryGreet, 2000);
+        return;
+      }
+      tried = true;
+      const res = await host.presenceArrival().catch(() => null);
+      if (!res?.ok || !res.text) {
+        brain.primeThought();
+        return;
+      }
+      const shown = brain.arrival(res.text);
+      if (!shown) {
+        tried = false;
+        setTimeout(tryGreet, 3000);
+        return;
+      }
+      host.presenceGreeted();
+      brain.primeThought();
+    };
+    setTimeout(tryGreet, 4600);
+  }
+  setInterval(() => {
+    if (!capri.stowed && !brain.thoughtPending) brain.primeThought();
+  }, 15 * 60 * 1000);
+
+  let nextThoughtMuse = Date.now() + (Number(config.randomThoughtMinutes) || 15) * 60000;
+  let nextQuestionMuse = Date.now() + (Number(config.randomQuestionMinutes) || 45) * 60000;
+  setInterval(() => {
+    if (capri.stowed || capri.dormant || capri.busy || capri.act) return;
+    if (panel.visible || guide.running || chat.open || brain.busySessions.length) return;
+    const now = Date.now();
+    if (config.randomQuestions && now >= nextQuestionMuse) {
+      nextQuestionMuse = now + (Number(config.randomQuestionMinutes) || 45) * 60000;
+      brain.muse('question');
+      return;
+    }
+    if (config.randomThoughts && now >= nextThoughtMuse) {
+      nextThoughtMuse = now + (Number(config.randomThoughtMinutes) || 15) * 60000;
+      brain.muse('thought');
+    }
+  }, 30000);
 
   // In the evening, after a real day's work, she brings you her report card once, on her own,
   // at a quiet moment.

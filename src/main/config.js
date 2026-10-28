@@ -20,6 +20,13 @@ const DEFAULTS = {
   provider: 'ollama', // who answers her chat: a key of llm.js PROVIDERS
   apiKeys: {},       // { openai: 'sk-...' }, else the provider's env variable
   customUrl: '',     // the 'custom' provider: any OpenAI-compatible base URL (http://host:port/v1)
+  temperature: 0.8,  // chat generation settings for OpenAI-compatible providers
+  maxTokens: 800,
+  topP: 1,
+  randomThoughts: true,  // occasional idle thoughts from the shared bot
+  randomThoughtMinutes: 15,
+  randomQuestions: false, // occasional idle questions, with a reply box
+  randomQuestionMinutes: 45,
   claudeCwd: null,   // the folder Claude Code works in (null: your home folder)
   userName: '',      // what she calls you
   persona: '',       // how you want her, in your words (her chat)

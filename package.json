@@ -1,9 +1,9 @@
 {
-  "name": "capri-desktop",
-  "version": "0.4.4",
-  "description": "Capri, the Project Capricorn construct, living on your desktop and narrating what Claude Code is doing.",
+  "name": "simply-capri",
+  "version": "0.5.0",
+  "description": "Simply Capri — a fork of Capri Desktop with unified settings, shared-memory thoughts, Spotify control and the Caelestia Home Assistant add-on.",
   "author": "mochiiwuff",
-  "repository": "github:mochiiwuff/capri-desktop",
+  "repository": "github:s1mplym4tt/simply-capri",
   "main": "src/main/main.js",
   "private": true,
   "scripts": {
@@ -40,19 +40,21 @@
     "@fontsource/jetbrains-mono": "^5.3.0"
   },
   "build": {
-    "appId": "capri.desktop",
-    "productName": "Capri",
+    "appId": "dev.s1mplym4tt.simplycapri",
+    "productName": "Simply Capri",
     "files": [
       "src/**",
       "assets/**",
       "hooks/**",
       "scripts/**",
       "package.json",
-      "LICENSE"
+      "LICENSE",
+      "integrations/**"
     ],
     "asarUnpack": [
       "hooks/**",
-      "src/main/windows.ps1"
+      "src/main/windows.ps1",
+      "integrations/**"
     ],
     "win": {
       "target": "nsis",
@@ -63,8 +65,17 @@
       "perMachine": false,
       "runAfterFinish": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Capri",
-      "artifactName": "Capri-Setup-${version}.${ext}"
+      "shortcutName": "Simply Capri",
+      "artifactName": "Simply-Capri-Setup-${version}.${ext}"
     }
-  }
+  },
+  "files": [
+    "integrations/**"
+  ],
+  "contributors": [
+    {
+      "name": "s1mplym4tt",
+      "url": "https://github.com/s1mplym4tt"
+    }
+  ]
 }

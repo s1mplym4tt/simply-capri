@@ -44,6 +44,8 @@ export class Capri {
     this.sprite = new SpriteRenderer(canvas, image);
     this.fx = fx;
     this.voice = voice;
+    this.host = null;      // set by app.js: display jumps
+    this.canJump = null;   // set by app.js: no jumping while a panel/chat is open
 
     this.scale = 0.6;
     this.view = { w: innerWidth, h: innerHeight, floor: innerHeight }; // floor: the top of the taskbar
@@ -234,6 +236,30 @@ export class Capri {
       this.pos.y = clamp(this.pos.y, SPRITE.height * this.scale, floor - 4);
     }
     this.place();
+  }
+
+  // Hop the whole overlay to another monitor, then settle on its floor.
+  async jumpScreen(options = {}) {
+    if (!this.host?.jumpScreen || this.stowed || this.busy || this.dragging || this.dormant) return false;
+    if (!options.force && this.canJump && !this.canJump()) return false;
+    const res = await this.host.jumpScreen(options).catch(() => null);
+    if (!res?.ok) return false;
+    this.setView(res.width, res.height, res.height - (res.gap || 0));
+    const spot = this.spot('random') || this.spot('post');
+    if (spot) {
+      this.stance = 'stand';
+      this.perch = null;
+      this.peekSide = null;
+      this.pos = { x: spot.x, y: spot.y };
+      this.facing = spot.x > this.view.w / 2 ? 1 : -1;
+      this.p.glitch = 0.8;
+      this.p.split = 5;
+      this.p.alpha = 1;
+      this.voice.play('teleport-in');
+      this.nextMove = performance.now() + rand(25000, 60000);
+      this.place();
+    }
+    return true;
   }
 
   get upside() {
@@ -562,6 +588,11 @@ export class Capri {
         this.teleport(to, { face: this.mouse.x < to.x ? 1 : -1 }).then(() => this.perform('curious', this.mouse && this.mouse.x < this.pos.x ? -1 : 1));
         return;
       }
+    }
+    // now and then she takes the whole window to the other monitor
+    if (Math.random() < 0.12 && this.host?.jumpScreen) {
+      this.jumpScreen();
+      return;
     }
     if (this.stance === 'sit' && this.perch?.id === 'taskbar') {
       // nothing to hop off or take over down there: a flourish, or off for a bit (she comes back)

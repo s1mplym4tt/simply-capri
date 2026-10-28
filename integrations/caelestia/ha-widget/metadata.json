@@ -1,0 +1,25 @@
+{
+    "id": "ha-widget",
+    "name": "Home Assistant Widget",
+    "description": "A floating desktop widget that shows live power draw (W) from Home Assistant and lets you toggle switches and dim lights right from your desktop. Drag it anywhere and pin it in place.",
+    "icon": "bolt",
+    "version": "1.0.0",
+    "type": "quickshell",
+    "author": {
+        "name": "simplymatt"
+    },
+    "license": "MIT",
+    "keywords": [
+        "home assistant",
+        "homeassistant",
+        "power",
+        "watts",
+        "energy",
+        "smart home",
+        "widget",
+        "dashboard"
+    ],
+    "shell-compat": {
+        "min": "2.3"
+    }
+}

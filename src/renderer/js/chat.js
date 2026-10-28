@@ -33,17 +33,21 @@ const TAG = /\[\[\s*(open|music|media|site)\s*:\s*([^\]]*)\]\]/i;
 const OPEN_ASK = /\b(open|launch|start|run)\b|ouvr|lance|démarre|abre|abrir|inicia|ejecuta|executa|открой|запусти/i;
 // what to do with the music playing, said plainly (only when it's about music, or said in a few words)
 const MEDIA_ASK = [
-  ['pause', /\b(pause|pausa|pausar)\b|stop (the )?music|arrête la musique|пауз/i],
-  ['next', /\b(next|skip|suivante?|siguiente|próxima|proxima)\b|passe (à )?la suivante|salta|pula|следующ/i],
-  ['previous', /\b(previous|précédente?|anterior)\b|предыдущ/i],
-  ['play', /\b(resume|reprends|reanuda|retoma)\b|relance la musique|remets la musique|продолж/i],
-  ['volup', /\b(louder|plus fort)\b|monte le son|turn (it )?up|sube el volumen|aumenta o volume|громче/i],
-  ['voldown', /\b(quieter|moins fort)\b|baisse le son|turn (it )?down|baja el volumen|abaixa o volume|тише/i],
-  ['mute', /\bmute\b|coupe le son|silencia|sem som|выключи звук/i],
+  ['pause', /\b(pause|pausa|pausar|zatrzymaj|wstrzymaj)\b|stop (the )?music|arrête la musique|пауз/i],
+  ['next', /\b(next|skip|suivante?|siguiente|próxima|proxima|następn|nastepn|przewiń|przewin)\b|passe (à )?la suivante|salta|pula|следующ/i],
+  ['previous', /\b(previous|précédente?|anterior|poprzedni|poprzednią|poprzednia)\b|предыдущ/i],
+  ['play', /\b(resume|reprends|reanuda|retoma|wznów|wznow|graj)\b|relance la musique|remets la musique|продолж/i],
+  ['volup', /\b(louder|plus fort|głośniej|glosniej|podgłoś|podglos)\b|monte le son|turn (it )?up|sube el volumen|aumenta o volume|громче/i],
+  ['voldown', /\b(quieter|moins fort|ciszej|ścisz|scisz|przycisz)\b|baisse le son|turn (it )?down|baja el volumen|abaixa o volume|тише/i],
+  ['mute', /\bmute\b|coupe le son|silencia|sem som|wycisz|выключи звук/i],
 ];
-const MUSIC_WORD = /musi|chanson|song|track|titre|morceau|spotify|canci|faixa|песн|музык|трек/i;
-// "put X on Spotify", "mets X sur Spotify", "pon X en Spotify", "coloca X no Spotify", "включи X в Spotify"
-const SPOTIFY_ASK = /(?:play|put on|put|mets|joue|lance|écoute|pon|toca|reproduce|coloca|toque|включи|поставь)\s+(?:moi\s+|me\s+)?(.+?)\s+(?:on|sur|en|no|na|в)\s+spotify/i;
+const MUSIC_WORD = /musi|chanson|song|track|titre|morceau|spotify|canci|faixa|piosen|utwór|utwor|playlist|album|песн|музык|трек/i;
+// "put X on Spotify", "mets X sur Spotify", "pon X en Spotify", "coloca X no Spotify", "включи X в Spotify",
+// Polish: "włącz/zagraj/znajdź X na Spotify" (and the diacritic-free forms).
+const SPOTIFY_ASK = /(?:play|find|search|look up|put on|put|mets|joue|lance|écoute|pon|toca|reproduce|coloca|toque|включи|поставь|włącz|wlacz|zagraj|znajdź|znajdz|wyszukaj|poszukaj|puść|puszczaj|odtwórz|odtworz)\s+(?:moi\s+|me\s+|mi\s+)?(.+?)\s+(?:on|sur|en|no|na|w|we|в)\s+spotify/i;
+// "puść Warsaw od The Blue Octavo" / "play Warsaw by The Blue Octavo" —
+// no need to repeat "na Spotify".
+const BY_ASK = /(?:puść|puszczaj|włącz|wlacz|zagraj|odtwórz|odtworz|znajdź|znajdz|wyszukaj|poszukaj|play|find|search)\s+(?:mi\s+|me\s+)?(.+?)\s+(?:od|by)\s+(.+?)(?:\s+(?:na|w|we|on)\s+spotify)?\s*$/i;
 const MEDIA_ACTIONS = new Set(MEDIA_ASK.map(([action]) => action));
 // "mets Bohemian Rhapsody sur YouTube", "play Daft Punk on youtube"
 const YOUTUBE_ASK = /(?:play|put on|put|mets|met|joue|lance|écoute|pon|toca|reproduce|coloca|bota|toque|включи|поставь)(?:[- ]moi|[- ]me|me)?\s+(.+?)\s+(?:on|sur|en|no|na|в)\s+youtube/i;
@@ -121,8 +125,8 @@ function robloxGame(text) {
 const LOOK_ASK = /regarde (?:mon|l['’]|ce que)|(?:jette|jeter) un (?:œil|oeil)|tu vois quoi|qu['’]est[- ]ce que tu vois|look at (?:my|the|this) screen|what(?:'s| is) on my screen|what do you see|take a look|mira (?:mi|la) pantalla|qu[ée] ves|olha (?:minha|a) tela|o que voc[êe] v[êe]|посмотри на (?:мой )?экран|что ты видишь/i;
 // what her tag needs to find in your message before it does anything: a small model tags answers about
 // anything ("[[music: synthwave]]" under a film tip), and music and the media keys act right away
-const LISTEN = /[ée]cout|listen|escuch|\bouv(ir|e)\b|слуша|playlist|album|\b(play|joue|mets|pon|toca|coloca)\b|включи|поставь/i;
-const SOUND = /\b(sound|volume|volumen)\b|\b(le|du|au) son\b|\bo som\b|звук|громк/i; // not "son": "his" in French
+const LISTEN = /[ée]cout|listen|escuch|\bouv(ir|e)\b|слуша|playlist|album|\b(play|joue|mets|pon|toca|coloca|włącz|wlacz|zagraj|znajdź|znajdz|posłuchaj|posluchaj|puść|puszczaj|odtwórz|odtworz)\b|включи|поставь/i;
+const SOUND = /\b(sound|volume|volumen|głośność|glosnosc|dźwięk|dzwiek)\b|\b(le|du|au) son\b|\bo som\b|звук|громк/i; // not "son": "his" in French
 const PLAY = /\bjou(er|e)\b|\bplay\b|jugar|juega|jogar|joga|играть|поигра/i;
 const SITE = /\b(site|web|page|lien|link|url|enlace|p[aá]gina)|сайт|ссылк|\.(com|fr|org|net|io|gg|tv|be|ch|ca|es|br|pt|ru)\b/i;
 // "appelle-moi Max", "call me Max", "llámame Max", "me chama de Max", "зови меня Макс"
@@ -176,7 +180,7 @@ export class Chat {
     return this.brain.t.chat;
   }
 
-  async start() {
+  async start(seed = '') {
     const { capri, host, t } = this;
     if (this.open) {
       this.panel.chatInput.focus();
@@ -219,6 +223,7 @@ export class Chat {
     this.agent = Boolean(status.agent); // Claude Code answers, as her, and really works in your project
     this.listApps();
     const shortModel = status.model.replace(/:latest$/, '').replace(/^models\//, ''); // Ollama's tag, Gemini's prefix
+    const shared = status.provider === 'custom';
     const tiny = status.provider === 'ollama' && TINY.test(status.model) && this.onBetterModel;
     // angry, sulking, dizzy…: she greets you the way she feels, and her model is told she did
     const feeling = this.bond?.feeling;
@@ -229,8 +234,9 @@ export class Chat {
     const shown = this.panel.say({
       kind: 'chat',
       face: moody ? MOOD_FACE[feeling] : 'look',
-      badge: t.badge,
-      tag: shortModel,
+      badge: shared ? 'DESKTOP' : t.badge,
+      tag: shared ? 'LINK · sxndrxnx' : shortModel,
+      desktop: shared,
       line: tiny ? fmt(t.tiny, { model: shortModel }) : hello,
       actions: tiny ? [{ id: 'better', label: t.better, primary: true }] : [],
       onAction: () => {
@@ -241,8 +247,8 @@ export class Chat {
         placeholder: t.placeholder,
         send: t.send,
         close: t.close,
-        noteTag: t.noteTag,
-        note: status.local ? t.note : t.noteCloud,
+        noteTag: shared ? 'LINK' : t.noteTag,
+        note: shared ? 'Connected to sxndrxnx · same memory as Discord.' : (status.local ? t.note : t.noteCloud),
       },
       onSend: (text) => this.send(text),
       onLeave: () => this.close(),
@@ -256,6 +262,7 @@ export class Chat {
     setTimeout(() => this.panel.chatInput.focus(), 150); // once the overlay has the keyboard
     capri.perform('hop');
     capri.nextMove = capri.nextGaze = performance.now() + STAY_MS;
+    if (seed && seed.trim()) setTimeout(() => this.send(seed.trim()), 200);
   }
 
   close() {
@@ -422,6 +429,10 @@ export class Chat {
     }
     const media = MEDIA_ASK.find(([, re]) => re.test(text))?.[0];
     if (media && (count <= 5 || MUSIC_WORD.test(text))) return { kind: 'media', action: media };
+    const link = /(?:open\.spotify\.com\/track\/|spotify:track:)([A-Za-z0-9]{10,})/i.exec(text);
+    if (link) return { kind: 'music', song: 'Spotify track', uri: `spotify:track:${link[1]}` };
+    const by = BY_ASK.exec(text);
+    if (by) return { kind: 'music', song: `${by[1].trim()} ${by[2].trim()}` };
     const song = SPOTIFY_ASK.exec(text)?.[1];
     if (song) return { kind: 'music', song };
     const video = YOUTUBE_ASK.exec(text)?.[1];
@@ -471,7 +482,8 @@ export class Chat {
     }
     if (asked.kind === 'music') {
       this.zap();
-      return (await this.host.music(asked.song)) ? { line: fmt(t.music, { song: asked.song }), face: 'laugh' } : null;
+      const played = await this.host.music(asked.uri || asked.song);
+      return played ? { line: fmt(t.music, { song: asked.song }), face: 'laugh' } : null;
     }
     if (asked.kind === 'youtube') return this.youtube(asked.song);
     if (asked.kind === 'roblox') {
@@ -726,7 +738,7 @@ export class Chat {
   // What she can do on the PC when you ask (Windows), and nothing else.
   powers() {
     const lines = [
-      'Only when the user asks you to open an app, a game, a file or folder on their desktop, or a folder like Downloads, to play music, to control the music playing, or to open a website: say in a few words that you will, and end your answer with one tag: [[open: NAME]], [[music: ARTIST - SONG]] (it plays on YouTube; if they did not say which song, pick one that fits), [[media: ACTION]] (ACTION: pause, play, next, previous, volup, voldown or mute), or [[site: ADDRESS]]. Some of these get a button to confirm, so never say it is already done. Any other time, write no tag at all: there are no other tags.',
+      'Only when the user asks you to open an app, a game, a file or folder on their desktop, or a folder like Downloads, to play something on Spotify, to control the music playing, or to open a website: say in a few words that you will, and end your answer with one tag: [[open: NAME]], [[music: WHAT TO PLAY]] (Spotify on this PC; if they did not say which song, pick one that fits), [[media: ACTION]] (ACTION: pause, play, next, previous, volup, voldown or mute), or [[site: ADDRESS]]. Some of these get a button to confirm, so never say it is already done. You do have access to Spotify on this PC: never claim you do not have Spotify or cannot control it. Any other time, write no tag at all: there are no other tags.',
     ];
     if (this.apps.length) {
       const open = this.apps.map(({ name, label }) => (label && label !== name ? `${name} (${label})` : name)).join(', ');

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Simply Capri Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="eyebrow">SIMPLY CAPRI // CONSTRUCT CONTROL</p>
+      <h1>Settings</h1>
+    </div>
+    <div class="top-actions">
+      <span id="version" class="version"></span>
+      <button id="close" class="ghost" title="Close settings">✕</button>
+    </div>
+  </header>
+
+  <p class="credit">
+    <strong>Simply Capri</strong> is a fork of Capri Desktop, created by <strong>mochiiwuff</strong>.
+    Fork, desktop integration and this settings panel by <strong>s1mplym4tt</strong>.
+  </p>
+
+  <main>
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">01 // LINK</p>
+          <h2>Who is she talking to?</h2>
+        </div>
+        <span id="connection-badge" class="badge">checking</span>
+      </div>
+
+      <label class="field">
+        <span>Provider</span>
+        <select id="provider"></select>
+      </label>
+
+      <label id="url-field" class="field">
+        <span>Base URL <small>OpenAI-compatible: OpenCode, LM Studio, llama.cpp, a bridge…</small></span>
+        <input id="customUrl" type="url" placeholder="http://192.168.0.113:8072/v1">
+      </label>
+
+      <label class="field">
+        <span>API key <small id="key-hint">stored keys are never shown again</small></span>
+        <input id="apiKey" type="password" autocomplete="off" placeholder="Paste a new key, or leave blank">
+      </label>
+
+      <label class="checkline">
+        <input id="clearKey" type="checkbox">
+        <span>Clear the stored key for this provider</span>
+      </label>
+
+      <div class="row">
+        <label class="field grow">
+          <span>Model</span>
+          <select id="model"></select>
+        </label>
+        <button id="refresh" class="secondary">Refresh models</button>
+      </div>
+
+      <p id="connection-note" class="note"></p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">02 // GENERATION</p>
+          <h2>How she answers</h2>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Temperature <output id="tempOut">0.80</output></span>
+        <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.8">
+      </label>
+
+      <div class="row">
+        <label class="field grow">
+          <span>Max tokens</span>
+          <input id="maxTokens" type="number" min="1" max="8192" step="1" value="800">
+        </label>
+        <label class="field grow">
+          <span>Top P</span>
+          <input id="topP" type="number" min="0" max="1" step="0.05" value="1">
+        </label>
+      </div>
+
+      <p class="note">Applied to OpenAI-compatible providers. Claude Code keeps its own generation settings.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">03 // MIND</p>
+          <h2>Thoughts and questions</h2>
+        </div>
+      </div>
+
+      <label class="checkline">
+        <input id="randomThoughts" type="checkbox">
+        <span>Let her share random thoughts when she is idle</span>
+      </label>
+      <label class="field compact">
+        <span>Thought interval <small>minutes</small></span>
+        <input id="randomThoughtMinutes" type="number" min="1" max="1440" step="1" value="15">
+      </label>
+
+      <label class="checkline">
+        <input id="randomQuestions" type="checkbox">
+        <span>Let her ask a random question now and then</span>
+      </label>
+      <label class="field compact">
+        <span>Question interval <small>minutes</small></span>
+        <input id="randomQuestionMinutes" type="number" min="1" max="1440" step="1" value="45">
+      </label>
+
+      <p class="note">Clicking her still gives a thought immediately. Random lines respect panels, chats and fullscreen work.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">04 // CAELESTIA</p>
+          <h2>Home Assistant + mood add-on</h2>
+        </div>
+        <span id="ha-badge" class="badge">unknown</span>
+      </div>
+
+      <p class="note" id="ha-note"></p>
+
+      <div class="row">
+        <button id="installHa" class="primary">Install / update add-on</button>
+        <button id="openHa" class="secondary">Open add-on folder</button>
+      </div>
+
+      <p class="note">
+        The add-on lives in the Home Assistant widget and shows Capri's real sxndrxnx
+        mood bars beneath today's energy consumption. It is Linux/KDE only.
+      </p>
+    </section>
+
+    <section class="card about">
+      <p class="eyebrow">05 // CREDITS</p>
+      <h2>Simply Capri · built on Capri Desktop</h2>
+      <p>
+        Original Capri Desktop by <strong>mochiiwuff</strong> ·
+        <button class="link" id="upstream">github.com/mochiiwuff/capri-desktop</button>
+      </p>
+      <p>
+        Fork and integration work by <strong>s1mplym4tt</strong>. Character artwork and
+        Capri remain the property of their respective rights holders.
+      </p>
+      <p class="note">MIT-licensed source. This is an AI-generated fan version of the character.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p id="save-status" class="note"></p>
+    <div class="footer-actions">
+      <button id="save" class="primary">Save settings</button>
+    </div>
+  </footer>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

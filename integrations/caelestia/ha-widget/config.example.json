@@ -1,0 +1,19 @@
+{
+  "url": "http://homeassistant.local:8123",
+  "token": "PASTE_YOUR_LONG_LIVED_ACCESS_TOKEN_HERE",
+  "refreshInterval": 3000,
+  "position": "bottom-right",
+  "screen": "primary",
+  "layer": "bottom",
+  "margin": 24,
+  "width": 320,
+  "icon": "bolt",
+  "title": "Home Assistant",
+  "wattage": { "entity": "sensor.example_power", "label": "Computer", "unit": "W" },
+  "sensors": [
+    { "entity": "sensor.example_energy_today", "label": "Today", "unit": "kWh" }
+  ],
+  "controls": [
+    { "entity": "light.example", "label": "Example light", "icon": "lightbulb", "brightness": true }
+  ]
+}

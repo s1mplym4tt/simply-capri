@@ -30,9 +30,14 @@ export class Brain {
     this.onLinked = null;
     this.onShowcase = null; // the demo's second half (app.js)
     this.onTalk = null;     // opens a chat with her (app.js, chat.js)
+    this.onReply = null;    // opens a chat seeded with a reply to a greeting/thought
     this.watching = true;   // she follows Claude Code (her menu; off, she just keeps you company)
     this.thinkTimer = 0;
     this.thinking = null;   // { s, since, said, fidget, gazed } while Claude is quiet mid-task
+    this.thoughts = [];     // short LLM thoughts, fetched ahead of a click
+    this.questions = [];    // unused cache for random questions
+    this.thoughtPending = false;
+    this.chatStatus = null; // provider/bridge state, for the LINK tag
   }
 
   get t() {
@@ -374,12 +379,91 @@ export class Brain {
     return name ? fmt(pick(this.t.custom.onlineName), { name }) : pick(this.t.online);
   }
 
-  // What she says when you click her. Nothing going on: she offers to talk (chat.js).
+  // The little line under a reply card: make the shared bridge visible.
+  linkNote() {
+    if (this.chatStatus?.provider === 'custom') {
+      return { noteTag: 'LINK', note: 'sxndrxnx · shared memory with Discord' };
+    }
+    return { noteTag: this.t.chat.noteTag, note: this.t.chat.note };
+  }
+
+  quickReply() {
+    return this.onReply ? {
+      quick: true,
+      chat: { quick: true, placeholder: this.t.chat.placeholder, send: this.t.chat.send, close: this.t.chat.close, ...this.linkNote() },
+      onSend: (reply) => this.onReply(reply),
+    } : {};
+  }
+
+  // A greeting written by the shared LLM for this login session. It can be
+  // answered right in the card; the line is added to the shared transcript so
+  // a later Discord reply has the same context.
+  arrival(text) {
+    this.voice.play('hello');
+    this.capri.perform('curious', this.capri.towardCenter());
+    const shown = this.say('info', text, null, {
+      face: 'grin',
+      hold: null,
+      ...this.quickReply(),
+    });
+    if (shown) this.commit(text);
+    return shown;
+  }
+
+  // Fetch one click-thought in the background, from the same shared memory as
+  // Discord. Clicks stay instant: use a cached thought, or her local line.
+  async primeThought(kind = 'thought') {
+    if (this.thoughtPending) return;
+    this.thoughtPending = true;
+    try {
+      const res = await this.host.presenceThought(kind);
+      if (res?.ok && res.text) {
+        if (kind === 'question') this.questions = [res.text, ...this.questions].slice(0, 2);
+        else this.thoughts = [res.text, ...this.thoughts].slice(0, 2);
+      }
+    } catch {
+      // offline bridge: local lines still work
+    } finally {
+      this.thoughtPending = false;
+    }
+  }
+
+  // Put a displayed greeting/thought into the shared transcript, so a reply
+  // from either the desktop card or Discord continues the same conversation.
+  commit(text) {
+    if (text) this.host.presenceCommit(text).catch(() => {});
+  }
+
+  // Show a spontaneous thought/question as a replyable card. The caller
+  // (app.js) decides when she is idle enough for one.
+  async muse(kind = 'thought') {
+    if (!this.onReply || this.panel.visible) return false;
+    const res = await this.host.presenceThought(kind === 'question' ? 'question' : 'thought').catch(() => null);
+    if (!res?.ok || !res.text || this.panel.visible) return false;
+    const shown = this.say(kind === 'question' ? 'info' : 'idle', res.text, null, {
+      face: kind === 'question' ? 'smug' : pick(['calm', 'smug', 'aside']),
+      hold: null,
+      ...this.quickReply(),
+    });
+    if (shown) this.commit(res.text);
+    return shown;
+  }
+
+  // What she says when you click her. Nothing going on: a thought of her own,
+  // then she offers to talk (chat.js).
   status() {
     const busy = this.busySessions;
     if (!busy.length) {
+      const thought = this.thoughts.shift();
+      if (!thought) this.primeThought();
       const talk = this.onTalk && { actions: [{ id: 'talk', label: this.t.chat.talk }], onAction: () => this.onTalk(), hold: 6000 };
-      this.say('idle', this.idleLine(), null, { face: pick(['calm', 'smug', 'aside']), hold: 4000, ...talk });
+      const shown = this.say('idle', thought || this.idleLine(), null, {
+        face: pick(['calm', 'smug', 'aside']),
+        ...talk,
+        hold: thought ? null : 4000,
+        ...(thought ? this.quickReply() : {}),
+      });
+      if (shown && thought) this.commit(thought);
       return;
     }
     const s = busy.sort((a, b) => b.seen - a.seen)[0];

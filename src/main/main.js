@@ -3,6 +3,8 @@
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
+const http = require('node:http');
+const { execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, protocol, net, shell, globalShortcut, nativeImage,
@@ -27,20 +29,65 @@ const demoSteps = require('../../scripts/demo-sequence');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DEV = process.argv.includes('--dev');
+
+// A fork gets a new application name, and Electron puts user data under that
+// name. Bring the old Capri config, memory and sounds across once so a rename
+// does not make her forget the user.
+function migrateUserData() {
+  const appData = app.getPath('appData');
+  const current = app.getPath('userData');
+  if (fs.existsSync(path.join(current, 'config.json'))) return;
+  const old = [path.join(appData, 'capri-desktop'), path.join(appData, 'Capri')]
+    .find((dir) => dir !== current && fs.existsSync(path.join(dir, 'config.json')));
+  if (!old) return;
+  try {
+    fs.mkdirSync(current, { recursive: true });
+    for (const name of ['config.json', 'memory.json', 'session-greeting.json', 'fullscreen-return.json']) {
+      const from = path.join(old, name);
+      if (fs.existsSync(from)) fs.copyFileSync(from, path.join(current, name));
+    }
+    for (const name of ['sounds', 'captures']) {
+      const from = path.join(old, name);
+      if (fs.existsSync(from)) fs.cpSync(from, path.join(current, name), { recursive: true, force: false });
+    }
+    console.log(`[capri] migrated user data from ${old} to ${current}`);
+  } catch (err) {
+    console.error('[capri] could not migrate user data:', err.message);
+  }
+}
 const PORT = Number(process.env.CAPRI_PORT) || 47823;
 const SOUND_EXT = /\.(mp3|wav|ogg|m4a)$/i;
 
 const OLLAMA_SITE = 'https://ollama.com';
+
+// Keep her animation loop alive when another window covers the full-screen
+// overlay; otherwise a teleport can freeze at alpha 0 while she is occluded.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'capri', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
 
 let overlay = null;
+let inputShape = null;
+let quitting = false;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
+let settingsWin = null;
 let demoTimer = null;
 let windowWatch = null;
+let pointerPoll = null; // Linux: feed the overlay the real cursor while it is click-through
+let fullscreenPoll = null;
+let fullscreenState = null;
+let lastBarInset = null;
+let fullscreenReturnId = null;
+let controlServer = null;
+let uiState = {};
+let capriMood = null;
+let moodPoll = null;
+let lastPointer = null;
 // the watcher only speaks when something changes: the overlay asks for this when it (re)loads
 let lastWindows = null;
 let chatModels = null; // the provider's models, as last seen (null: not reached)
@@ -72,6 +119,51 @@ function forgetChats() {
   llm.resetClaude();
   saveMemory({ history: [], claude: null });
   sendCommand('forget');
+}
+
+// One login greeting per real login session: XDG_SESSION_ID changes on logout,
+// boot_id changes on reboot. A manual restart within the same session is silent.
+function sessionKey() {
+  let boot = '';
+  try { boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch {}
+  const session = process.env.XDG_SESSION_ID || process.env.DISPLAY || '';
+  return `${session}:${boot}`;
+}
+const greetingFile = () => path.join(app.getPath('userData'), 'session-greeting.json');
+function greetedThisSession() {
+  try {
+    return JSON.parse(fs.readFileSync(greetingFile(), 'utf8')).session === sessionKey();
+  } catch {
+    return false;
+  }
+}
+function markGreeted() {
+  try {
+    fs.writeFileSync(greetingFile(), JSON.stringify({ session: sessionKey(), at: new Date().toISOString() }));
+  } catch (err) {
+    console.error('[capri] could not save session greeting state:', err.message);
+  }
+}
+
+// Where she was before a fullscreen app pushed her off a monitor. Persisted so
+// a restart while the app was still fullscreen can still bring her back.
+const fullscreenReturnFile = () => path.join(app.getPath('userData'), 'fullscreen-return.json');
+function loadFullscreenReturn() {
+  try {
+    return JSON.parse(fs.readFileSync(fullscreenReturnFile(), 'utf8')).displayId ?? null;
+  } catch {
+    return null;
+  }
+}
+function saveFullscreenReturn(displayId) {
+  try {
+    fs.writeFileSync(fullscreenReturnFile(), JSON.stringify({ displayId }));
+  } catch (err) {
+    console.error('[capri] could not save fullscreen return screen:', err.message);
+  }
+}
+function clearFullscreenReturn() {
+  try { fs.rmSync(fullscreenReturnFile(), { force: true }); } catch {}
 }
 
 // capri://app/...        -> files of this repo
@@ -130,17 +222,78 @@ function moveOverlay(id) {
 // over it), less its top row of pixels: a window on top covering the whole screen is a fullscreen
 // app to Windows (animated wallpapers pause, notifications wait). `gap`: how much of her window is
 // below the top of the taskbar (0, or its height).
+function screenBarBottom(display) {
+  const screens = fullscreenState?.screens;
+  if (!Array.isArray(screens) || !display) return 0;
+  const b = display.bounds;
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const screen = screens.find(s => cx >= s.x && cx < s.x + s.w && cy >= s.y && cy < s.y + s.h);
+  return Math.max(0, Math.round(Number(screen?.barBottom) || 0));
+}
+
 function overlayArea() {
-  const { workArea, bounds } = targetDisplay();
+  const display = targetDisplay();
+  const { workArea, bounds } = display;
   const area = config.load().rest === 'taskbar' ? { ...bounds, y: bounds.y + 1, height: bounds.height - 1 } : workArea;
-  return { area, gap: area.y + area.height - (workArea.y + workArea.height) };
+  // Caelestia's bar is not always reflected in KWin's work area (notably on
+  // DP-2). Its own thickness is the real floor when she is meant to sit above
+  // the taskbar.
+  const barInset = screenBarBottom(display);
+  return {
+    area,
+    gap: Math.max(area.y + area.height - (workArea.y + workArea.height), barInset),
+  };
 }
 
 function fitOverlay() {
   if (!overlay) return;
+  const before = overlay.getBounds();
   const { area, gap } = overlayArea();
   overlay.setBounds(area);
+  if (inputShape && (before.width !== area.width || before.height !== area.height)) {
+    restartInputShapeHelper();
+  }
   overlay.webContents.send('overlay:resize', { width: area.width, height: area.height, gap });
+}
+
+// Move her overlay to the next display, keeping the config so a restart comes
+// back to the same screen. The renderer settles her on the new floor itself.
+function jumpDisplay(options = {}) {
+  const displays = screen.getAllDisplays();
+  if (displays.length < 2) return { ok: false, reason: 'single' };
+  const current = targetDisplay();
+  const index = Math.max(0, displays.findIndex((d) => d.id === current.id));
+  const free = displays.filter((d) => !displayHasFullscreen(d));
+  const otherFree = free.filter((d) => d.id !== current.id);
+  // Never land on a monitor that is currently showing a fullscreen app.
+  let next;
+  if (options.returnTo && fullscreenReturnId) {
+    next = displays.find((d) => d.id === fullscreenReturnId);
+    if (!next) {
+      fullscreenReturnId = null;
+      return { ok: false, reason: 'missing-return' };
+    }
+    if (displayHasFullscreen(next)) return { ok: false, reason: 'still-fullscreen' };
+    fullscreenReturnId = null;
+    clearFullscreenReturn();
+  } else if (otherFree.length) {
+    next = otherFree[0];
+    if (displayHasFullscreen(current)) {
+      fullscreenReturnId = current.id;
+      saveFullscreenReturn(current.id);
+    }
+  } else if (!free.length) {
+    return { ok: false, reason: 'fullscreen' };
+  } else if (free.length === 1) {
+    return { ok: false, reason: 'only-free-is-current' };
+  } else {
+    next = displays[(index + 1) % displays.length];
+  }
+  config.save({ displayId: next.id });
+  fitOverlay();
+  const { area, gap } = overlayArea();
+  return { ok: true, displayId: next.id, width: area.width, height: area.height, gap };
 }
 
 // The pointer reaches her click-through window through a mouse hook, and Windows drops a hook that
@@ -148,12 +301,215 @@ function fitOverlay() {
 // clicked anymore. Off then on puts in a new one; her place on top and her size are set again too.
 function rearmOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
-  overlay.setIgnoreMouseEvents(false);
-  overlay.setIgnoreMouseEvents(true, { forward: true });
+  if (process.platform !== 'linux') {
+    overlay.setIgnoreMouseEvents(false);
+    overlay.setIgnoreMouseEvents(true, { forward: true });
+  }
   overlay.setAlwaysOnTop(true, 'screen-saver');
   fitOverlay();
   sendCommand('rearmed'); // click-through again: she waits for the pointer to be on her
   console.log('[capri] mouse hook set up again');
+}
+
+// X11 has no `forward: true` for setIgnoreMouseEvents, so a click-through
+// Electron window never sees the pointer. Poll the real cursor and hand the
+// renderer its position; it can then turn interaction on when the pointer is
+// over her body or her panel, and off again when it leaves.
+function startPointerPoll() {
+  if (process.platform !== 'linux' || pointerPoll) return;
+  pointerPoll = setInterval(() => {
+    if (!overlay || overlay.isDestroyed()) return;
+    const p = screen.getCursorScreenPoint();
+    const b = overlay.getBounds();
+    const x = Math.round(p.x - b.x);
+    const y = Math.round(p.y - b.y);
+    const inside = x >= 0 && y >= 0 && x < b.width && y < b.height;
+    lastPointer = { x, y, inside };
+    // Send every tick, not only on movement: the first send can land before
+    // the renderer has registered its listener, and a stationary pointer then
+    // never becomes interactive.
+    overlay.webContents.send('overlay:pointer', lastPointer);
+  }, 50);
+}
+
+function readFullscreenState() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync('/tmp/capri-fullscreen.json', 'utf8'));
+    if (Array.isArray(parsed?.screens)) fullscreenState = parsed;
+  } catch {
+    // Caelestia may not have written it yet
+  }
+}
+
+function displayHasFullscreen(display) {
+  const screens = fullscreenState?.screens;
+  if (!Array.isArray(screens) || !display) return false;
+  const b = display.bounds;
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  return screens.some(s => s.fullscreen && cx >= s.x && cx < s.x + s.w && cy >= s.y && cy < s.y + s.h);
+}
+
+function startFullscreenPoll() {
+  if (fullscreenPoll) return;
+  fullscreenPoll = setInterval(() => {
+    if (!overlay || overlay.isDestroyed()) return;
+    readFullscreenState();
+    if (!fullscreenState) return;
+    const inset = screenBarBottom(targetDisplay());
+    if (inset !== lastBarInset) {
+      lastBarInset = inset;
+      fitOverlay();
+    }
+    const on = displayHasFullscreen(targetDisplay());
+    const backDisplay = fullscreenReturnId
+      ? screen.getAllDisplays().find((d) => d.id === fullscreenReturnId)
+      : null;
+    const back = Boolean(!on && backDisplay && !displayHasFullscreen(backDisplay));
+    overlay.webContents.send('overlay:fullscreen', { on, return: back });
+  }, 1500);
+}
+
+function startInputShapeHelper() {
+  if (process.platform !== 'linux' || inputShape) return;
+  let windowId;
+  try {
+    const ids = execFileSync('xdotool', ['search', '--name', '^Capri$'], { encoding: 'utf8' })
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    windowId = ids[ids.length - 1];
+  } catch (err) {
+    console.error('[capri] could not find X11 window for input shape:', err.message);
+    return;
+  }
+  if (!windowId) return;
+  inputShape = spawn('python3', [path.join(__dirname, 'input_shape.py'), windowId], {
+    stdio: ['pipe', 'ignore', 'inherit'],
+    env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0' },
+  });
+  inputShape.on('exit', (code) => {
+    console.log('[capri] input shape helper exited', code);
+    inputShape = null;
+  });
+  inputShape.stdin.write('0 0 0 0\n');
+}
+
+function restartInputShapeHelper() {
+  if (!inputShape) return;
+  inputShape.kill();
+  inputShape = null;
+  setTimeout(startInputShapeHelper, 300);
+}
+
+function setInputShape(bounds) {
+  if (!inputShape || !inputShape.stdin.writable || !bounds) return;
+  const x = Math.max(0, Math.round(Number(bounds.x) || 0));
+  const y = Math.max(0, Math.round(Number(bounds.y) || 0));
+  const w = Math.max(0, Math.round(Number(bounds.w) || 0));
+  const h = Math.max(0, Math.round(Number(bounds.h) || 0));
+  inputShape.stdin.write(`${x} ${y} ${w} ${h}\n`);
+}
+
+function screenNameFor(display) {
+  const screens = fullscreenState?.screens;
+  if (Array.isArray(screens) && display) {
+    const b = display.bounds;
+    const cx = b.x + b.width / 2;
+    const cy = b.y + b.height / 2;
+    const found = screens.find(s => cx >= s.x && cx < s.x + s.w && cy >= s.y && cy < s.y + s.h);
+    if (found?.name) return String(found.name);
+  }
+  return String(display?.label || display?.id || '');
+}
+
+function moveToPrimaryDisplay() {
+  const primary = screen.getPrimaryDisplay();
+  if (!overlay || targetDisplay().id === primary.id) return { ok: true, already: true, displayId: primary.id };
+  fullscreenReturnId = null;
+  clearFullscreenReturn();
+  config.save({ displayId: primary.id });
+  fitOverlay();
+  const { area, gap } = overlayArea();
+  return { ok: true, displayId: primary.id, width: area.width, height: area.height, gap };
+}
+
+async function refreshMood() {
+  const cfg = config.load();
+  if (cfg.provider !== 'custom' || !cfg.customUrl) {
+    capriMood = { enabled: false, active: false };
+    return;
+  }
+  try {
+    const opened = llmConfig(cfg);
+    const res = await fetch(`${cfg.customUrl.replace(/\/+$/, '')}/mood`, {
+      headers: { authorization: `Bearer ${opened.apiKeys?.custom || ''}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`mood ${res.status}`);
+    capriMood = await res.json();
+  } catch {
+    capriMood = { enabled: false, active: false, offline: true };
+  }
+}
+
+function startMoodPoll() {
+  if (moodPoll) return;
+  refreshMood();
+  moodPoll = setInterval(refreshMood, 5000);
+}
+
+function startControlServer() {
+  if (controlServer) return;
+  controlServer = http.createServer((req, res) => {
+    const send = (status, payload) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+    if (req.method === 'GET' && req.url === '/state') {
+      const display = targetDisplay();
+      return send(200, {
+        ...uiState,
+        mood: capriMood,
+        screen: screenNameFor(display),
+        displayId: display.id,
+        main: display.id === screen.getPrimaryDisplay().id,
+        connected: config.load().provider === 'custom',
+        at: Date.now(),
+      });
+    }
+    if (req.method === 'POST' && req.url === '/action') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; if (body.length > 10000) req.destroy(); });
+      req.on('end', () => {
+        let data = {};
+        try { data = JSON.parse(body || '{}'); } catch {}
+        const action = String(data.action || '');
+        try {
+          if (action === 'return') return send(200, moveToPrimaryDisplay());
+          if (action === 'jump') return send(200, jumpDisplay({}));
+          if (action === 'status') { sendCommand('status'); return send(200, { ok: true }); }
+          if (action === 'talk') { sendCommand('chat'); return send(200, { ok: true }); }
+          if (action === 'mood') { sendCommand('mood', { mood: String(data.mood || 'idle') }); return send(200, { ok: true }); }
+          if (action === 'media') {
+            launch.media(String(data.media || 'pause')).then((ok) => send(200, { ok }), (err) => send(200, { ok: false, error: err.message }));
+            return;
+          }
+          if (action === 'music') {
+            launch.music(String(data.query || '')).then((ok) => send(200, { ok }), (err) => send(200, { ok: false, error: err.message }));
+            return;
+          }
+          return send(400, { ok: false, error: 'unknown action' });
+        } catch (err) {
+          return send(500, { ok: false, error: err.message });
+        }
+      });
+      return;
+    }
+    send(404, { ok: false, error: 'not found' });
+  });
+  controlServer.on('error', (err) => console.error('[capri] control server:', err.message));
+  controlServer.listen(47824, '127.0.0.1', () => console.log('[capri] control server on 127.0.0.1:47824'));
 }
 
 // Back on top of everything, the taskbar included (it comes up over her when it's clicked). Twice:
@@ -180,10 +536,10 @@ function createOverlay() {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    focusable: false,
+    focusable: process.platform === 'linux',
     hasShadow: false,
     alwaysOnTop: true,
-    type: process.platform === 'win32' ? 'toolbar' : undefined,
+    type: process.platform === 'win32' ? 'toolbar' : process.platform === 'linux' ? 'toolbar' : undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
@@ -196,13 +552,37 @@ function createOverlay() {
   });
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
-  overlay.setIgnoreMouseEvents(true, { forward: true });
+  if (process.platform !== 'linux') overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
   // always shown: put away, she's still there as her biochip in the corner. Sized again first:
   // Windows keeps a new window inside the work area, and resting on the taskbar it covers it too.
   overlay.once('ready-to-show', () => {
     fitOverlay();
     overlay.showInactive();
+    fullscreenReturnId = fullscreenReturnId ?? loadFullscreenReturn();
+    startInputShapeHelper();
+    startPointerPoll();
+    startFullscreenPoll();
+    startControlServer();
+    startMoodPoll();
+  });
+  // The pet is deliberately not closable from the taskbar / Alt+F4. Quit from
+  // the tray menu instead; that sets `quitting` and lets the real close through.
+  overlay.on('close', (event) => {
+    if (!quitting) event.preventDefault();
+  });
+  overlay.on('closed', () => {
+    // If something destroys the X11 window directly (bypassing WM_DELETE),
+    // bring the pet back rather than leaving a headless process behind.
+    if (inputShape) {
+      inputShape.kill();
+      inputShape = null;
+    }
+    controlServer?.close();
+    overlay = null;
+    if (!quitting) setTimeout(() => {
+      if (!overlay) createOverlay();
+    }, 500);
   });
   overlay.webContents.on('render-process-gone', (_e, details) => {
     console.error('[capri] renderer gone:', details.reason);
@@ -323,9 +703,11 @@ function rebuildTray() {
     { label: t.sync(Math.min(100, Math.floor(xp / 10)), t.stages[stage]), enabled: false },
     { type: 'separator' },
     { label: t.teleport, click: () => sendCommand('teleport') },
+    { label: t.otherScreen, click: () => sendCommand('jumpScreen') },
     { label: t.satellite, click: () => sendCommand('satellite') },
     { label: t.demo, click: playDemo },
     { label: t.help, click: () => sendCommand('welcome') },
+    { label: t.settings, click: () => openSettings() },
     ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
     { label: t.talk, click: () => sendCommand('chat') },
     { label: t.lookNow, click: () => sendCommand('look') },
@@ -369,7 +751,7 @@ function rebuildTray() {
           label: `${i + 1} — ${d.size.width}×${d.size.height}`,
           type: 'radio',
           checked: d.id === current,
-          click: () => d.id !== current && sendCommand('goScreen', { id: d.id }), // she goes over there herself
+          click: () => { fullscreenReturnId = null; clearFullscreenReturn(); config.save({ displayId: d.id }); fitOverlay(); rebuildTray(); },
         })),
         { type: 'separator' },
         { label: t.follow, type: 'checkbox', checked: cfg.follow !== false, click: (item) => updateConfig({ follow: item.checked }) },
@@ -665,17 +1047,96 @@ async function pickClaudeFolder() {
   updateConfig({ claudeCwd: filePaths[0] });
 }
 
+function haPaths() {
+  const home = app.getPath('home');
+  let source = path.join(ROOT, 'integrations', 'caelestia', 'ha-widget');
+  if (app.isPackaged) source = source.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
+  return {
+    source,
+    target: path.join(home, '.config', 'caelestia', 'plugins', 'ha-widget'),
+  };
+}
+
+function settingsSnapshot() {
+  const cfg = config.load();
+  const { apiKeys, ...rest } = cfg;
+  const paths = haPaths();
+  return {
+    config: { ...rest, keys: Object.keys(apiKeys || {}) },
+    providers: Object.entries(llm.PROVIDERS).map(([id, p]) => ({ id, label: p.label, local: Boolean(p.local) })),
+    models: chatModels || [],
+    model: pickModel(cfg),
+    chatError,
+    ha: {
+      supported: process.platform === 'linux',
+      source: paths.source,
+      target: paths.target,
+      available: fs.existsSync(paths.source),
+      installed: fs.existsSync(paths.target),
+    },
+    platform: process.platform,
+    version: app.getVersion(),
+  };
+}
+
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  settingsWin = new BrowserWindow({
+    width: 900,
+    height: 760,
+    minWidth: 760,
+    minHeight: 620,
+    title: 'Simply Capri Settings',
+    backgroundColor: '#0e0b14',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'settings', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  settingsWin.loadURL('capri://app/src/settings/index.html');
+  settingsWin.on('closed', () => { settingsWin = null; });
+}
+
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
   tray = new Tray(icon);
-  tray.setToolTip('Capri');
+  tray.setToolTip('Simply Capri');
   tray.on('click', () => sendCommand('status'));
   rebuildTray();
 }
 
 function registerIpc() {
   ipcMain.on('overlay:interactive', (_e, on) => {
+    if (process.platform === 'linux') return; // X11 input shape helper owns this
     overlay?.setIgnoreMouseEvents(!on, { forward: true });
+  });
+  ipcMain.on('overlay:state', (_e, state) => {
+    if (state && typeof state === 'object') uiState = { ...uiState, ...state };
+  });
+  ipcMain.on('overlay:bounds', (_e, b) => {
+    if (!overlay || !b) return;
+    const ob = overlay.getBounds();
+    const display = screen.getDisplayMatching(ob);
+    const payload = {
+      x: ob.x + Math.round(Number(b.x) || 0),
+      y: ob.y + Math.round(Number(b.y) || 0),
+      w: Math.max(0, Math.round(Number(b.w) || 0)),
+      h: Math.max(0, Math.round(Number(b.h) || 0)),
+      screen: display.label || '',
+    };
+    setInputShape(b);
+    try {
+      const tmp = '/tmp/capri-bounds.json.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(payload));
+      fs.renameSync(tmp, '/tmp/capri-bounds.json');
+    } catch {}
   });
   ipcMain.on('overlay:rearm', () => rearmOverlay()); // the pointer moved over her and she never heard of it
   ipcMain.handle('overlay:cursor', () => {
@@ -702,6 +1163,89 @@ function registerIpc() {
     return { origin: { x: o.x, y: o.y }, width: o.width, height: o.height, gap: overlayArea().gap };
   });
   ipcMain.handle('config:get', () => rendererConfig());
+  ipcMain.handle('settings:get', () => settingsSnapshot());
+  ipcMain.handle('settings:refresh', async () => {
+    const models = await refreshModels();
+    return { ok: Boolean(models?.length), models: models || [], error: chatError, model: pickModel() };
+  });
+  ipcMain.handle('settings:save', async (_e, data = {}) => {
+    const before = config.load();
+    const provider = String(data.provider || before.provider);
+    if (!llm.PROVIDERS[provider]) return { ok: false, error: 'Unknown provider' };
+    const patch = { provider };
+    if (provider === 'custom') {
+      const url = String(data.customUrl || '').trim();
+      if (!url) return { ok: false, error: 'An OpenAI-compatible base URL is required' };
+      patch.customUrl = url;
+    }
+    if (data.model) patch.chatModel = String(data.model);
+    for (const [key, min, max] of [['temperature', 0, 2], ['maxTokens', 1, 8192], ['topP', 0, 1]]) {
+      if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+        const n = Number(data[key]);
+        if (!Number.isFinite(n)) return { ok: false, error: `${key} must be a number` };
+        patch[key] = Math.max(min, Math.min(max, n));
+      }
+    }
+    for (const [key, min, max] of [['randomThoughtMinutes', 1, 1440], ['randomQuestionMinutes', 1, 1440]]) {
+      if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+        const n = Math.round(Number(data[key]));
+        if (!Number.isFinite(n)) return { ok: false, error: `${key} must be a number` };
+        patch[key] = Math.max(min, Math.min(max, n));
+      }
+    }
+    if (typeof data.randomThoughts === 'boolean') patch.randomThoughts = data.randomThoughts;
+    if (typeof data.randomQuestions === 'boolean') patch.randomQuestions = data.randomQuestions;
+    const keys = { ...(before.apiKeys || {}) };
+    if (data.clearKey) delete keys[provider];
+    if (data.apiKey !== undefined && String(data.apiKey).trim()) keys[provider] = setup.sealKey(String(data.apiKey).trim());
+    patch.apiKeys = keys;
+    config.save(patch);
+    const models = await refreshModels();
+    updateConfig({});
+    return {
+      ok: true,
+      warning: models && models.length ? null : (chatError || 'No models found — check the URL or key'),
+      models: models || [],
+      model: pickModel(),
+      snapshot: settingsSnapshot(),
+    };
+  });
+  ipcMain.handle('settings:install-ha', () => {
+    if (process.platform !== 'linux') return { ok: false, error: 'The Caelestia add-on is Linux/KDE only' };
+    const { source, target } = haPaths();
+    if (!fs.existsSync(source)) return { ok: false, error: 'Add-on files are missing from this build' };
+    try {
+      fs.mkdirSync(target, { recursive: true });
+      fs.cpSync(source, target, {
+        recursive: true,
+        force: true,
+        filter: (src) => path.basename(src) !== 'config.json',
+      });
+      const example = path.join(source, 'config.example.json');
+      const configFile = path.join(target, 'config.json');
+      if (!fs.existsSync(configFile) && fs.existsSync(example)) fs.copyFileSync(example, configFile);
+      return { ok: true, target, snapshot: settingsSnapshot() };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('settings:open-ha', () => {
+    const { target } = haPaths();
+    fs.mkdirSync(target, { recursive: true });
+    shell.openPath(target);
+    return { ok: true, target };
+  });
+  ipcMain.handle('settings:open-external', (_e, url) => {
+    try {
+      const parsed = new URL(String(url));
+      if (!['http:', 'https:'].includes(parsed.protocol)) return { ok: false };
+      shell.openExternal(parsed.toString());
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+  ipcMain.on('settings:close', () => settingsWin?.close());
   ipcMain.handle('hooks:status', () => activeHooks().status());
   ipcMain.handle('config:set', (_e, patch) => updateConfig(patch));
   ipcMain.handle('demo:window', (_e, open) => demoWindow(open));
@@ -745,6 +1289,58 @@ function registerIpc() {
     }
   });
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
+  // Transient desktop lines. Arrival is once per login session; thoughts are
+  // generated on demand and never written to the shared transcript.
+  ipcMain.handle('presence:arrival', async () => {
+    if (greetedThisSession()) return { ok: false, reason: 'already' };
+    const cfg = config.load();
+    if (cfg.provider !== 'custom') return { ok: false, reason: 'bridge' };
+    if (cfg.visible === false || !overlay || !overlay.isVisible()) return { ok: false, reason: 'hidden' };
+    try {
+      const text = await llm.desktopEvent(cfg.provider, llmConfig(cfg), {
+        kind: 'arrival',
+        context: { time: new Date().toLocaleString('en-GB'), lang: cfg.lang },
+      });
+      if (!text) return { ok: false, reason: 'empty' };
+      return { ok: true, text };
+    } catch (err) {
+      console.error('[capri] arrival greeting failed:', err.message);
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('presence:greeted', () => {
+    markGreeted();
+    return { ok: true };
+  });
+  ipcMain.handle('presence:commit', async (_e, text) => {
+    const cfg = config.load();
+    if (cfg.provider !== 'custom') return { ok: false, reason: 'bridge' };
+    const line = String(text || '').trim();
+    if (!line) return { ok: false, reason: 'empty' };
+    try {
+      await llm.desktopCommit(cfg.provider, llmConfig(cfg), line);
+      return { ok: true };
+    } catch (err) {
+      console.error('[capri] desktop line commit failed:', err.message);
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('display:jump', (_e, options) => jumpDisplay(options || {}));
+  ipcMain.handle('presence:thought', async (_e, kind) => {
+    const cfg = config.load();
+    if (cfg.provider !== 'custom') return { ok: false, reason: 'bridge' };
+    const eventKind = kind === 'question' ? 'question' : 'thought';
+    try {
+      const text = await llm.desktopEvent(cfg.provider, llmConfig(cfg), {
+        kind: eventKind,
+        context: { time: new Date().toLocaleString('en-GB'), lang: cfg.lang },
+      });
+      return text ? { ok: true, text } : { ok: false, reason: 'empty' };
+    } catch (err) {
+      console.error(`[capri] desktop ${eventKind} failed:`, err.message);
+      return { ok: false, error: err.message };
+    }
+  });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
   ipcMain.handle('look:snap', async () => {
     try {
@@ -856,6 +1452,12 @@ function registerIpc() {
   // typing to her: the overlay takes the keyboard while the chat is open, and gives it back after
   ipcMain.on('overlay:focus', (_e, on) => {
     if (!overlay) return;
+    if (process.platform === 'linux') {
+      // Keep the Linux overlay managed by KWin so its above rule applies.
+      if (on) overlay.focus();
+      else overlay.blur();
+      return;
+    }
     overlay.setFocusable(Boolean(on));
     if (on) overlay.focus();
     else overlay.blur();
@@ -1000,6 +1602,17 @@ async function debugHandler(route, body) {
     fs.writeFileSync(file, image.toPNG());
     return { ok: true, file };
   }
+  if (route === 'eval') {
+    return { value: await overlay.webContents.executeJavaScript(String(body.js || 'null'), true) };
+  }
+  if (route === 'pointer') {
+    overlay.webContents.send('overlay:pointer', { x: Math.round(body.x), y: Math.round(body.y), inside: true });
+    return { ok: true };
+  }
+  if (route === 'ignore') {
+    overlay.setIgnoreMouseEvents(Boolean(body.on), { forward: true });
+    return { ok: true };
+  }
   throw new Error('unknown debug route');
 }
 
@@ -1023,8 +1636,9 @@ function main() {
     app.quit();
     return;
   }
+  migrateUserData();
   app.on('second-instance', () => sendCommand('status'));
-  if (process.platform === 'win32') app.setAppUserModelId('capri.desktop');
+  if (process.platform === 'win32') app.setAppUserModelId('dev.s1mplym4tt.simplycapri');
 
   app.whenReady().then(() => {
     if (!['codex', 'claude'].includes(config.load().assistant)) config.save({ assistant: activeAssistant().id });
@@ -1032,6 +1646,7 @@ function main() {
     registerIpc();
     createOverlay();
     createTray();
+    if (process.argv.includes('--settings')) openSettings();
     windowWatch = startWindowWatch({
       overlay,
       onUpdate: (data) => {
@@ -1066,9 +1681,22 @@ function main() {
     powerMonitor.on('unlock-screen', () => setTimeout(rearmOverlay, 1000));
   });
 
+  app.on('before-quit', () => {
+    quitting = true;
+  });
+
   app.on('will-quit', () => {
+    settingsWin?.destroy();
     globalShortcut.unregisterAll();
     windowWatch?.stop();
+    if (pointerPoll) clearInterval(pointerPoll);
+    if (fullscreenPoll) clearInterval(fullscreenPoll);
+    if (moodPoll) clearInterval(moodPoll);
+    if (inputShape) {
+      inputShape.kill();
+      inputShape = null;
+    }
+    try { fs.rmSync('/tmp/capri-bounds.json', { force: true }); } catch {}
   });
   app.on('window-all-closed', (e) => e.preventDefault());
 }
