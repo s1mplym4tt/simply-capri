@@ -11,9 +11,9 @@ import { clean, mood } from './chat.js';
 const FIRST_AFTER = 2 * 60 * 1000; // turned on: her first look a couple of minutes later
 const EVERY = [8, 15];             // then every 8 to 15 minutes…
 const ACTIVE_MS = 90 * 1000;       // …if you're at your PC (the pointer moved lately)…
-const SAME_WINDOW_MS = 25 * 60 * 1000; // …and on another window than last time (or a good while later)
+const SAME_WINDOW_MS = 10 * 60 * 1000; // …and on another window, or after a while on the same one
 // what her AI is asked about the picture
-const PROMPT = 'This is a picture of the user\'s screen right now. If you see a small figure with a big red mane, that\'s you: leave it out. Name one concrete thing you really see on it (the app or website, a title, a picture, a word), then react to it in character: curious, playful or teasing. One or two short sentences, talking to them.';
+const PROMPT = 'This is a picture of the user\'s screen right now. If you see a small figure with a big red mane, that\'s you: leave it out. Notice what the user appears to be doing — the app, page, code, game or conversation in front of them — and comment on that activity in character: curious, playful or teasing. Name one concrete detail you really see, then react. One or two short sentences, talking to them.';
 
 export class Look {
   constructor({ capri, panel, brain, chat, guide, host, fx, voice, active }) {

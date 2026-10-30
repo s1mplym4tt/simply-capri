@@ -277,10 +277,12 @@ see?" in her chat: she looks and answers right there, your conversation in mind)
 
 **She looks at your screen**, if you want. Her menu › **Look at my screen**: her eyes go to the window in front, a
 scanline sweeps it, and she tells you what she makes of it, her way. **Look at my screen now and then** lets her do it
-on her own, every 8 to 15 minutes, when you're there and you've switched windows (off until you tick it). The first
-time, she tells you where the picture goes: to her chat's AI. With an AI on your PC, nothing leaves it; with an online
-one, the picture goes to that service. She never keeps the picture, and her chat remembers what she said for a while.
-It takes a model that can read pictures: gemma3 on your PC, Gemini or OpenAI online (not llama3.2, she'll tell you).
+on her own, every 8 to 15 minutes, when you're there and you've switched windows — or after 10 minutes on the same one
+(off until you tick it). The first time, she tells you where the picture goes: to her chat's AI. With an AI on your PC,
+nothing leaves it; with an online one, the picture goes to that service. With the sxndrxnx bridge, the picture and her
+observation are recorded in the bot's shared memory so Discord Capri can recall them; with a direct model, the desktop
+does not keep the picture. It takes a model that can read pictures: gemma3 on your PC, DeepSeek Flash, Gemini or
+OpenAI online (not llama3.2, she'll tell you).
 
 ### Make her yours
 
@@ -485,7 +487,9 @@ The title of the window in front of you is only checked, on your PC, against a l
 it's never kept or sent anywhere.
 
 When she looks at your screen (only when you ask, or if you ticked *Look at my screen now and then*), a picture of the
-screen goes to her chat's AI: on your PC with Ollama (a local model), to the online service otherwise. It's never written to disk.
+screen goes to her chat's AI: on your PC with Ollama (a local model), to the online service otherwise. With a direct
+model the desktop does not write it to disk; when the sxndrxnx bridge handles the turn, the image is stored with the
+shared Discord memory. Captures are sent only while you have screen-looking enabled.
 
 ## Art direction
 
