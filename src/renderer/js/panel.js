@@ -93,6 +93,14 @@ export class Panel {
     return !this.el.hidden && !this.suspended && !this.leaving;
   }
 
+  // A comment with a reply box: clicking her/Capri should let you answer it,
+  // not dismiss the card.
+  focusReply() {
+    if (!this.current?.chat) return false;
+    this.chatInput.focus();
+    return true;
+  }
+
   // Message: { kind, line, tag, quote, reply, summary, log: [{verb, target, error}], actions, guide,
   //            hold (ms | null for sticky) }
   // reply: Claude's whole answer, in a block that scrolls

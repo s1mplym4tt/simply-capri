@@ -441,8 +441,8 @@ export class Brain {
     const shown = this.say('idle', line, null, {
       face: pick(['calm', 'smug', 'aside']),
       ...talk,
-      hold: thought ? null : 5000,
-      ...(thought ? this.quickReply() : {}),
+      hold: null,
+      ...this.quickReply(),
     });
     if (shown) this.commit(line);
   }

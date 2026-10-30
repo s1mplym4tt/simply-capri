@@ -4,7 +4,7 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
 const http = require('node:http');
-const { execFileSync, spawn } = require('node:child_process');
+const { execFile, execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, protocol, net, shell, globalShortcut, nativeImage,
@@ -1079,26 +1079,81 @@ async function chatWithFallback(cfg, messages, send, signal, streamed) {
   }
 }
 
-// She looks at your screen (look.js): a picture of the screen she's on, kept here in memory a moment
-// for her AI to look at, never written anywhere. 1280 px wide at most: enough to read, light to send.
-const snaps = new Map(); // id -> the picture, base64 JPEG
+// She looks at your screen (look.js): one picture, or every monitor when enabled, kept here in
+// memory a moment for her AI to look at, never written by the desktop. 1280 px wide at most.
+// On KDE, Spectacle captures the KWin desktop directly (no XDG portal prompt), so Capri can
+// look alongside Discord/Vice instead of competing for a ScreenCast session.
+const snaps = new Map(); // id -> [base64 JPEG]
+const runFile = (cmd, args) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { timeout: 12000 }, (err, out, stderr) => (err ? reject(new Error(String(stderr || err.message))) : resolve(out)));
+});
+
+async function spectacleSnap(cfg) {
+  if (process.platform !== 'linux' || !fs.existsSync('/usr/bin/spectacle')) return null;
+  if (!/kde/i.test(String(process.env.XDG_CURRENT_DESKTOP || '')) && !fs.existsSync('/usr/bin/kwin_wayland') && !fs.existsSync('/usr/bin/kwin_x11')) return null;
+  const tmp = path.join(os.tmpdir(), `capri-look-${randomUUID()}.png`);
+  try {
+    await runFile('spectacle', ['-b', '-n', '-f', '-o', tmp]);
+    const full = nativeImage.createFromPath(tmp);
+    if (full.isEmpty()) return null;
+    const all = displays();
+    const minX = Math.min(...all.map((d) => d.bounds.x));
+    const minY = Math.min(...all.map((d) => d.bounds.y));
+    const maxX = Math.max(...all.map((d) => d.bounds.x + d.bounds.width));
+    const maxY = Math.max(...all.map((d) => d.bounds.y + d.bounds.height));
+    const size = full.getSize();
+    const sx = size.width / Math.max(1, maxX - minX);
+    const sy = size.height / Math.max(1, maxY - minY);
+    const targets = cfg.lookAllScreens ? all : [targetDisplay()];
+    const images = [];
+    for (const d of targets) {
+      const x = Math.max(0, Math.round((d.bounds.x - minX) * sx));
+      const y = Math.max(0, Math.round((d.bounds.y - minY) * sy));
+      const w = Math.min(size.width - x, Math.max(1, Math.round(d.bounds.width * sx)));
+      const h = Math.min(size.height - y, Math.max(1, Math.round(d.bounds.height * sy)));
+      if (w <= 1 || h <= 1) continue;
+      let image = full.crop({ x, y, width: w, height: h });
+      if (image.getSize().width > 1280) image = image.resize({ width: 1280 });
+      images.push(image.toJPEG(72).toString('base64'));
+    }
+    return images.length ? images : null;
+  } catch (err) {
+    console.error('[capri] spectacle look failed:', err.message);
+    return null;
+  } finally {
+    try { fs.rmSync(tmp, { force: true }); } catch {}
+  }
+}
+
 async function snapScreen() {
-  const d = targetDisplay();
-  const k = d.scaleFactor || 1;
-  const fit = Math.min(1, 1280 / (d.bounds.width * k));
-  const size = { width: Math.round(d.bounds.width * k * fit), height: Math.round(d.bounds.height * k * fit) };
-  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
-  const src = sources.find((s) => s.display_id === String(d.id)) || sources[0];
-  if (!src || src.thumbnail.isEmpty()) throw new Error('no picture of the screen');
-  return src.thumbnail.toJPEG(72).toString('base64');
+  const cfg = config.load();
+  const captured = await spectacleSnap(cfg);
+  if (captured) return captured;
+
+  // Non-KDE / no Spectacle: fall back to Electron's screen capturer.
+  const targets = cfg.lookAllScreens ? displays() : [targetDisplay()];
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: 1280, height: 1280 },
+  });
+  const images = [];
+  for (const d of targets) {
+    let src = sources.find((s) => s.display_id === String(d.id));
+    if (!src && targets.length === 1) src = sources[0];
+    if (!src) src = sources[displays().findIndex((x) => x.id === d.id)];
+    if (!src || src.thumbnail.isEmpty()) continue;
+    images.push(src.thumbnail.toJPEG(72).toString('base64'));
+  }
+  if (!images.length) throw new Error('no picture of the screen');
+  return images;
 }
 
 // What her AI says about that picture, as her (`persona`), asked `prompt`. With a code when it can't:
 // 'noai' (nothing to ask), 'novision' (that model can't look at pictures).
 async function sayAboutSnap({ id, persona, prompt, history = [] }) {
-  const image = snaps.get(id);
+  const images = snaps.get(id);
   snaps.delete(id);
-  if (!image) return { ok: false, error: 'the picture is gone' };
+  if (!Array.isArray(images) || !images.length) return { ok: false, error: 'the picture is gone' };
   const cfg = config.load();
   if (!chatModels?.length) await refreshModels();
   const model = pickModel(cfg);
@@ -1107,8 +1162,14 @@ async function sayAboutSnap({ id, persona, prompt, history = [] }) {
   if (cfg.provider === 'deepseek' && !/flash|vision/i.test(model)) return { ok: false, code: 'novision', model };
   if (cfg.provider === 'ollama' && !(await ollama.canSee(model))) return { ok: false, code: 'novision', model };
   const user = cfg.provider === 'ollama'
-    ? { role: 'user', content: prompt, images: [image] }
-    : { role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } }] };
+    ? { role: 'user', content: prompt, images }
+    : {
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        ...images.map((image) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } })),
+      ],
+    };
   // asked in her chat: the conversation so far comes before it (text only)
   const before = (Array.isArray(history) ? history : []).filter((m) => typeof m?.content === 'string' && ['user', 'assistant'].includes(m.role));
   const messages = [{ role: 'system', content: persona }, ...before, user];
@@ -1355,6 +1416,11 @@ function registerIpc() {
     }
     if (typeof data.randomThoughts === 'boolean') patch.randomThoughts = data.randomThoughts;
     if (typeof data.randomQuestions === 'boolean') patch.randomQuestions = data.randomQuestions;
+    if (typeof data.lookAllScreens === 'boolean') patch.lookAllScreens = data.lookAllScreens;
+    if (typeof data.watchScreen === 'boolean') {
+      patch.watchScreen = data.watchScreen;
+      if (data.watchScreen) patch.lookAsked = true;
+    }
     const keys = { ...(before.apiKeys || {}) };
     if (data.clearKey) delete keys[provider];
     if (data.apiKey !== undefined && String(data.apiKey).trim()) keys[provider] = setup.sealKey(String(data.apiKey).trim());

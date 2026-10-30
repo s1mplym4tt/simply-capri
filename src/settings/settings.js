@@ -143,6 +143,8 @@ function populate(data) {
   $('randomThoughtMinutes').value = Number(data.config.randomThoughtMinutes ?? 15);
   $('randomQuestions').checked = data.config.randomQuestions === true;
   $('randomQuestionMinutes').value = Number(data.config.randomQuestionMinutes ?? 45);
+  $('watchScreen').checked = data.config.watchScreen === true;
+  $('lookAllScreens').checked = data.config.lookAllScreens === true;
 
   const ha = data.ha || {};
   setBadge('ha-badge', ha.installed ? 'installed' : (ha.supported ? 'not installed' : 'linux only'), ha.installed ? 'ok' : '');
@@ -184,6 +186,8 @@ function collect() {
     randomThoughtMinutes: Number($('randomThoughtMinutes').value),
     randomQuestions: $('randomQuestions').checked,
     randomQuestionMinutes: Number($('randomQuestionMinutes').value),
+    watchScreen: $('watchScreen').checked,
+    lookAllScreens: $('lookAllScreens').checked,
   };
 }
 

@@ -31,12 +31,14 @@ carte Caelestia reste disponible dans `integrations/caelestia/ha-widget/`.
 
 ## Voir l'écran
 
-Son menu contient **Regarder mon écran**. Elle capture l'écran où elle se trouve, le
-redimensionne en JPEG 1280 px en mémoire et l'envoie au modèle de chat comme image. Avec
-un modèle compatible OpenAI ou Ollama capable de vision, elle peut lire le texte visible,
-reconnaître les fenêtres et décrire les images. Simply Capri n'écrit pas la capture sur le
-disque ; elle part vers le fournisseur configuré dans les réglages. Utilise un modèle local
-si tu veux qu'elle reste sur ton PC.
+Son menu contient **Regarder mon écran**. Elle capture l'écran où elle se trouve,
+redimensionne chaque capture en JPEG 1280 px en mémoire et l'envoie au modèle de chat comme
+image. Active **Inclure tous les écrans quand elle regarde** dans les réglages pour envoyer
+une image par moniteur. Avec un modèle compatible OpenAI ou Ollama capable de vision, elle
+peut lire le texte visible, reconnaître les fenêtres et décrire les images. Sous KDE, elle
+capture via Spectacle/KWin, qui écrit un PNG temporaire puis le supprime aussitôt ; le JPEG
+envoyé au fournisseur reste en mémoire. Utilise un modèle local si tu veux qu'elle reste sur
+ton PC.
 
 Claude Code et les modèles texte ne voient pas les images. Elle le dit au lieu de faire
 semblant. Le modèle DeepSeek actuel `deepseek-flash` accepte les images ; `deepseek-v4-pro`
@@ -47,6 +49,18 @@ Quand le fournisseur choisi est le pont sxndrxnx, la capture et sa réponse entr
 mémoire partagée du bot : Capri sur Discord peut donc se rappeler ce qu'elle a vu. La capture
 n'est pas publiée dans un salon Discord ; seule la mémoire partagée la voit. Avec un
 fournisseur direct (DeepSeek, OpenRouter, un modèle local), l'image part chez ce fournisseur.
+
+**Réponses :** les commentaires des regards, de la jalousie, des lancers, des clics et des
+esquives ont maintenant une petite zone de réponse. Cliquer sur Capri quand elle est ouverte
+donne le focus à cette zone au lieu de fermer la carte, et le chat continue avec le même
+contexte partagé.
+
+**Plusieurs captures :** sous KDE, Capri utilise Spectacle/KWin au lieu d'une session ScreenCast
+du portail XDG. Cela libère le portail pour Discord et Vice ; Capri ne consomme pas leur flux.
+Discord et Vice peuvent encore se gêner si le portail/compositeur n'autorise qu'une session
+ScreenCast — ce n'est pas contrôlable par Capri. Si l'un refuse de démarrer, utilise OBS comme
+unique producteur et sa caméra virtuelle, ou arrête l'autre capture. Capri ne reçoit pas une
+copie du flux de Discord ou de Vice.
 
 ## Ce qu'elle fait
 

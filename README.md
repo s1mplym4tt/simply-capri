@@ -67,12 +67,13 @@ card remains available under `integrations/caelestia/ha-widget/`.
 
 ## Seeing the screen
 
-Her menu has **Look at my screen**. She captures the display she is on, resizes it to a
-1280px JPEG in memory, and sends it to the current chat model as an image. On a
-vision-capable OpenAI-compatible or Ollama model she can read visible text, recognise
-windows and describe images. The capture is not written to disk by Simply Capri; it is
-sent to the provider configured in Settings, so use a local model if you want it to stay
-on your PC.
+Her menu has **Look at my screen**. She captures the display she is on, resizes each
+capture to a 1280px JPEG in memory, and sends it to the current chat model as an image.
+Turn on **Include every monitor when she looks** in Settings to send one image per screen.
+On a vision-capable OpenAI-compatible or Ollama model she can read visible text, recognise
+windows and describe images. On KDE she captures through Spectacle/KWin, which briefly writes a
+temporary PNG and deletes it immediately; the JPEG sent to the provider is held in memory. Use a
+local model if you want the picture to stay on your PC.
 
 Claude Code and text-only models cannot see images. For those, she says the model has no
 vision instead of pretending. DeepSeek's current `deepseek-flash` model accepts images; its
@@ -83,6 +84,17 @@ When the selected provider is the sxndrxnx desktop bridge, the screenshot and he
 into the bot's shared turn/memory, so Discord Capri can recall what she saw. The screenshot
 is not posted to a Discord channel; only the shared memory sees it. With a direct provider
 (DeepSeek, OpenRouter, a local model), the image goes to that provider instead.
+
+**Replies:** comments from screen glances, jealousy, throws, clicks and dodges now carry a
+small reply box. Clicking Capri while one is open focuses that box instead of dismissing it,
+and the resulting chat continues from the same shared context.
+
+**Multiple capture clients:** on KDE, Capri uses Spectacle/KWin rather than an XDG portal
+ScreenCast session. That frees the portal for Discord streaming and Vice recording; Capri
+does not consume one of their streams. Discord and Vice may still compete with each other if
+the portal/compositor only permits one ScreenCast session — that is outside Capri's control.
+If one refuses to start, use OBS as the single capture producer and its virtual camera, or
+stop the other capture first. Capri does not get a copy of Discord's or Vice's stream.
 
 ## What she does
 
@@ -281,8 +293,8 @@ on her own, every 8 to 15 minutes, when you're there and you've switched windows
 (off until you tick it). The first time, she tells you where the picture goes: to her chat's AI. With an AI on your PC,
 nothing leaves it; with an online one, the picture goes to that service. With the sxndrxnx bridge, the picture and her
 observation are recorded in the bot's shared memory so Discord Capri can recall them; with a direct model, the desktop
-does not keep the picture. It takes a model that can read pictures: gemma3 on your PC, DeepSeek Flash, Gemini or
-OpenAI online (not llama3.2, she'll tell you).
+does not keep the picture after the temporary Spectacle file is removed. It takes a model that can read pictures:
+gemma3 on your PC, DeepSeek Flash, Gemini or OpenAI online (not llama3.2, she'll tell you).
 
 ### Make her yours
 
@@ -489,9 +501,10 @@ The title of the window in front of you is only checked, on your PC, against a l
 it's never kept or sent anywhere.
 
 When she looks at your screen (only when you ask, or if you ticked *Look at my screen now and then*), a picture of the
-screen goes to her chat's AI: on your PC with Ollama (a local model), to the online service otherwise. With a direct
-model the desktop does not write it to disk; when the sxndrxnx bridge handles the turn, the image is stored with the
-shared Discord memory. Captures are sent only while you have screen-looking enabled.
+screen goes to her chat's AI: on your PC with Ollama (a local model), to the online service otherwise. KDE uses
+Spectacle/KWin and a temporary file that is removed immediately; non-KDE uses Electron's screen capturer. When the
+sxndrxnx bridge handles the turn, the image is stored with the shared Discord memory. Captures are sent only while you
+have screen-looking enabled.
 
 ## Art direction
 

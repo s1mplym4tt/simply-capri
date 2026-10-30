@@ -266,7 +266,14 @@ export class Jealousy {
       tier,
       feeling: this.bond.feeling || null,
     }, fallback);
-    this.panel.say({ kind: 'info', face: ['aside', 'aside', 'look', 'look', 'many'][stage], line, hold: 4500 });
+    this.panel.say({
+      kind: 'info',
+      face: ['aside', 'aside', 'look', 'look', 'many'][stage],
+      line,
+      hold: null,
+      ...this.brain.quickReply(),
+    });
+    this.brain.commit(line);
     if (stage >= 1 && this.bond.feeling !== 'sulk') this.bond.feel('jealous', { rival: RIVALS[key] });
   }
 

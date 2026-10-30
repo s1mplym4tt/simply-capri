@@ -226,7 +226,10 @@ async function boot() {
     if (panel.visible || Math.random() >= (when === 'end' ? 0.6 : 0.4)) return;
     const fallback = pick(lines);
     const line = await brain.eventLine('gaze', { when }, fallback);
-    if (!panel.visible) panel.say({ kind: 'info', line, hold: 3800 });
+    if (!panel.visible) {
+      panel.say({ kind: 'info', line, hold: null, ...brain.quickReply() });
+      brain.commit(line);
+    }
   };
   // Tell the Caelestia bridge where the interactive parts are, so its
   // full-screen drawer window can subtract a click-through hole there.
@@ -323,8 +326,9 @@ async function boot() {
 
   // Clicking her: what's going on, or she offers to talk. Sulking, she turns her back on you.
   capri.onClick = () => {
-    if (panel.visible) panel.hide();
-    else if (!jealousy.onClick()) {
+    if (panel.visible) {
+      if (!panel.focusReply()) panel.hide();
+    } else if (!jealousy.onClick()) {
       brain.click();
       bond.add('click', 1);
     }
@@ -374,7 +378,8 @@ async function boot() {
     }
     if (feel && bond.feeling !== 'angry') bond.feel(feel);
     const shown = await brain.eventLine('throw', { how, hard, count: throws.length, feeling: feel || bond.feeling || null }, line);
-    panel.say({ kind: 'info', face, line: shown, hold: 3800 });
+    panel.say({ kind: 'info', face, line: shown, hold: null, ...brain.quickReply() });
+    brain.commit(shown);
   };
   // you said sorry in her chat: she lets it go (and lets you pick her up again)
   bond.onCalm = () => {
@@ -384,7 +389,8 @@ async function boot() {
   capri.onDodge = async () => {
     const fallback = pick(brain.t.thrown.dodge);
     const line = await brain.eventLine('dodge', {}, fallback);
-    panel.say({ kind: 'info', face: 'smug', line, hold: 2500 });
+    panel.say({ kind: 'info', face: 'smug', line, hold: null, ...brain.quickReply() });
+    brain.commit(line);
   };
 
   // A new stage with you: her minds come out to look at you, and she says so, the sync bar under it.

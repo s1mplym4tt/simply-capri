@@ -150,7 +150,11 @@ export class Look {
       const text = clean(res.text).replace(/^["“«]\s*|\s*["”»]$/g, ''); // no quotes around what she says
       if (!text) return;
       this.chat.seen = { text, at: Date.now() };
-      this.panel.say({ kind: 'info', badge: 'SCAN', face: mood(text), line: text, hold: Math.min(13000, Math.max(5000, 2500 + text.length * 55)) });
+      this.brain.commit(text);
+      this.panel.say({
+        kind: 'info', badge: 'SCAN', face: mood(text), line: text, hold: null,
+        ...this.brain.quickReply(),
+      });
     } finally {
       this.looking = false;
     }
