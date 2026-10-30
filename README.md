@@ -7,6 +7,8 @@
 > shared-memory desktop thoughts/questions, Linux/KDE integration, Spotify playback and the
 > Caelestia Home Assistant / mood add-on. Original artwork and character rights remain with their
 > respective holders.
+>**WARNING!!** This project can quickly become irrelevant due to the fast pace of progress by the original creator. 
+>My goal is to create a full on suite with a discord self-bot with unified memory bus and behaviour system,with character sheets based on Sillytavern V3 card system. Capri is just a skin for it, while the rest is purely modular.
 
 
 Capri, the *Project Capricorn* construct from Cyberpunk: Edgerunners season 2, lives on your desktop
