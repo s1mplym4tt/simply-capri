@@ -39,7 +39,8 @@ disque ; elle part vers le fournisseur configuré dans les réglages. Utilise un
 si tu veux qu'elle reste sur ton PC.
 
 Claude Code et les modèles texte ne voient pas les images. Elle le dit au lieu de faire
-semblant. Il n'y a pas encore de secours OCR local. Cela fonctionne sous Linux
+semblant. Le modèle DeepSeek actuel `deepseek-flash` accepte les images ; `deepseek-v4-pro`
+non. Il n'y a pas encore de secours OCR local. Cela fonctionne sous Linux
 (X11/XWayland) comme sous Windows.
 
 ## Ce qu'elle fait
@@ -136,8 +137,8 @@ semblant. Il n'y a pas encore de secours OCR local. Cela fonctionne sous Linux
 
 ![Elle s'endort jusqu'à son masque, se réveille, et rangée en bas à gauche](docs/sleep.png)
 
-Le suivi des fenêtres ne marche que sous Windows pour l'instant (un petit script PowerShell lit la position des fenêtres, jamais leur contenu ; le titre de celle qui est devant sert seulement à repérer une autre IA, voir « Elle s'attache à toi », et le dossier de son programme à reconnaître un jeu ; les clés USB branchées ne sont vues que par leur lettre, les autres appareils par le nom que Windows leur donne).
-Sur macOS et Linux, elle flotte, dépasse des bords, tombe et se balade quand même.
+Le suivi des fenêtres marche sous Windows et sous KDE Plasma 6 (via le pont KWin ci-dessous). Un petit helper lit la position des fenêtres, jamais leur contenu ; le titre de celle qui est devant sert seulement à repérer une autre IA, voir « Elle s'attache à toi ». La détection de jeux et les événements USB restent réservés à Windows.
+Sur macOS, elle flotte, dépasse des bords, tombe et se balade quand même.
 
 ### Elle te fait visiter
 
@@ -277,7 +278,7 @@ fois attachée, elle est contente quand tu reviens à ton PC et vient parfois d'
 êtes : en haut de son menu.
 
 **Et elle est jalouse.** Quand la fenêtre devant toi est une autre IA (ChatGPT, Gemini, Copilot, Perplexity, DeepSeek,
-Grok, Le Chat, Character.AI, Meta AI, Codex, ou Claude quand elle surveille Codex), elle le remarque et le dit, plus ou
+Grok, Le Chat, Character.AI, Meta AI, OpenCode, Codex, ou Claude quand elle surveille Codex), elle le remarque et le dit, plus ou
 moins bien selon où vous en êtes. Si tu y restes, une fois attachée, elle va s'asseoir sur sa fenêtre, te fusille du
 regard et la possède, sourcils froncés, avec un mot à elle écrit dessus. Ensuite elle boude : clique sur elle et elle te
 tourne le dos (ça passe, et en parler dans son chat aide). Son chat sait aussi quelles autres IA tu as utilisées

@@ -1,6 +1,6 @@
 --- a/services/Kwin.qml
 +++ b/services/Kwin.qml
-@@ -352,8 +352,64 @@
+@@ -352,8 +352,66 @@
          ]);
      }
  
@@ -10,6 +10,7 @@
 +            ['chatgpt', /chatgpt/i],
 +            ['claude', /claude/i],
 +            ['codex', /codex/i],
++            ['opencode', /opencode/i],
 +            ['gemini', /gemini/i],
 +            ['copilot', /copilot/i],
 +            ['perplexity', /perplexity/i],
@@ -32,6 +33,7 @@
 +                y: Math.round(w.y || 0),
 +                w: Math.round(w.width || 0),
 +                h: Math.round(w.height || 0),
++                pid: Number(w.pid || 0),
 +                max: Boolean(w.maximized || w.fullscreen),
 +            })),
 +        ai: root.activeWindow ? root.capriAi(root.activeWindow) : [],

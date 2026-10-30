@@ -106,15 +106,19 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
         y: Math.round(Number(w.y) - bounds.y),
         w: Math.round(Number(w.w) || 0),
         h: Math.round(Number(w.h) || 0),
+        pid: Number(w.pid) || 0,
         max: Boolean(w.max),
       }))
       .filter((w) => w.id && w.w > 0 && w.h > 0
         && w.x < bounds.width && w.x + w.w > 0
         && w.y < bounds.height && w.y + w.h > 0);
+    const ai = Array.isArray(data.ai) ? data.ai.slice() : [];
+    const active = wins.find((w) => w.id === String(data.fg || ''));
+    if (active?.pid && processTreeHas(active.pid, 'opencode') && !ai.includes('opencode')) ai.push('opencode');
     const payload = {
       fg: String(data.fg || ''),
       taskbar: Boolean(data.taskbar),
-      ai: Array.isArray(data.ai) ? data.ai : [],
+      ai,
       game: data.game || null,
       usb: Array.isArray(data.usb) ? data.usb : [],
       plug: data.plug || null,
@@ -136,6 +140,19 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
     },
     refresh: send,
   };
+}
+
+// A TUI such as OpenCode may run inside a terminal, so the foreground window's
+// title is just the shell's. Walk the active window's process tree as well.
+function processTreeHas(pid, needle, seen = new Set()) {
+  if (!Number.isInteger(pid) || pid <= 0 || seen.has(pid)) return false;
+  seen.add(pid);
+  let comm = '';
+  try { comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim().toLowerCase(); } catch {}
+  if (comm.includes(needle)) return true;
+  let children = [];
+  try { children = fs.readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8').trim().split(/\s+/).filter(Boolean).map(Number); } catch {}
+  return children.some((child) => processTreeHas(child, needle, seen));
 }
 
 module.exports = { startWindowWatch };

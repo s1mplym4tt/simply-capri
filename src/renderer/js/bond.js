@@ -150,7 +150,7 @@ export class Bond {
 
 // The other AIs she can spot, by the key windows.ps1 gives them.
 export const RIVALS = {
-  chatgpt: 'ChatGPT', claude: 'Claude', codex: 'Codex', gemini: 'Gemini', copilot: 'Copilot', perplexity: 'Perplexity',
+  chatgpt: 'ChatGPT', claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', gemini: 'Gemini', copilot: 'Copilot', perplexity: 'Perplexity',
   deepseek: 'DeepSeek', grok: 'Grok', lechat: 'Le Chat', characterai: 'Character.AI', metaai: 'Meta AI',
 };
 // the one she watches is no rival of hers (Antigravity runs on Gemini)

@@ -13,6 +13,7 @@ function aiKeys(w) {
         ["chatgpt", /chatgpt/i],
         ["claude", /claude/i],
         ["codex", /codex/i],
+        ["opencode", /opencode/i],
         ["gemini", /gemini/i],
         ["copilot", /copilot/i],
         ["perplexity", /perplexity/i],
@@ -51,6 +52,7 @@ function publish() {
                 y: Math.round(g.y || 0),
                 w: Math.round(g.width || 0),
                 h: Math.round(g.height || 0),
+                pid: Number(w.pid || 0),
                 max: Boolean(w.maximized || w.fullscreen)
             });
         }

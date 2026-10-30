@@ -75,7 +75,8 @@ sent to the provider configured in Settings, so use a local model if you want it
 on your PC.
 
 Claude Code and text-only models cannot see images. For those, she says the model has no
-vision instead of pretending. There is no built-in OCR fallback yet. This works on Linux
+vision instead of pretending. DeepSeek's current `deepseek-flash` model accepts images; its
+`deepseek-v4-pro` model does not. There is no built-in OCR fallback yet. This works on Linux
 (X11/XWayland) as well as Windows.
 
 ## What she does
@@ -167,8 +168,8 @@ vision instead of pretending. There is no built-in OCR fallback yet. This works 
 
 ![Asleep down to her mask, waking up, and put away bottom left](docs/sleep.png)
 
-Window tracking is Windows-only for now (a tiny PowerShell helper reads window positions, never their contents; the title of the one in front is only used to spot another AI, see "She gets attached", and its program's folder to tell a game; the USB sticks plugged in are seen by their drive letter, other devices by the name Windows gives them).
-On macOS and Linux she still floats, peeks, falls and wanders.
+Window tracking works on Windows and on KDE Plasma 6 (through the KWin bridge below). A tiny helper reads window positions, never their contents; the title of the one in front is only used to spot another AI, see "She gets attached". Game detection and USB events are still Windows-only.
+On macOS she still floats, peeks, falls and wanders.
 
 ### She shows you around
 
@@ -299,7 +300,7 @@ to you, what she says after a few days without you. Once she's attached, she's g
 sometimes comes over to your pointer on her own. Where you two stand: at the top of her menu.
 
 **And she gets jealous.** When the window in front of you is another AI (ChatGPT, Gemini, Copilot, Perplexity,
-DeepSeek, Grok, Le Chat, Character.AI, Meta AI, Codex, or Claude when she watches Codex), she notices and says so, more
+DeepSeek, Grok, Le Chat, Character.AI, Meta AI, OpenCode, Codex, or Claude when she watches Codex), she notices and says so, more
 or less nicely depending on where you two stand. If you stay on it, once she's attached, she goes and sits on its
 window, glares at you and takes it over, brows down, with a word of hers written across it. Then she sulks: click her
 and she turns her back on you (it passes, and talking it over in her chat helps). Her chat also knows which other AIs
@@ -322,7 +323,7 @@ She only catches the mouse on her actual body (pixel-precise): the rest of the s
   to bring her back.
 - **Her menu**: right-click her (it's also on her tray icon, next to the clock): teleport, look at the satellite, demo,
   how it works, mission report, talk to her, look at your screen, reminders, size, sound, screen (and following you across screens), AI
-  model, wander, possess your windows, jealous of other AIs, react to my PC, language, start with Windows, hooks. At the very top:
+  model, wander, possess your windows, jealous of other AIs, react to my PC, language, start with the system, hooks. At the very top:
   where you two stand.
 
 She speaks **French, English, Spanish, Brazilian Portuguese and Russian**, and picks the language of your system on her

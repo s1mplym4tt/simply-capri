@@ -51,6 +51,7 @@ public static class CapriWindows {
     new[] { "chatgpt", @"\bChatGPT\b", "chatgpt" },
     new[] { "claude", @"\bClaude\b", "claude" },
     new[] { "codex", @"\bCodex\b", "codex" },
+    new[] { "opencode", @"\bOpenCode\b", "opencode" },
     new[] { "gemini", @"\bGemini\b", "" },
     new[] { "copilot", @"\bCopilot\b", "copilot" },
     new[] { "perplexity", @"\bPerplexity\b", "perplexity" },
