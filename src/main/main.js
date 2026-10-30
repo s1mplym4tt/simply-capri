@@ -857,10 +857,10 @@ function rebuildTray() {
       })),
     },
     {
-      label: t.startup,
+      label: process.platform === 'linux' ? t.startup.replace(/Windows/gi, 'system') : t.startup,
       type: 'checkbox',
-      checked: app.getLoginItemSettings(loginItemOptions()).openAtLogin,
-      click: (item) => app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: item.checked }),
+      checked: autostartEnabled(),
+      click: (item) => setAutostart(item.checked),
     },
     // her hooks, while she watches Claude Code
     ...(cfg.claude ? [
@@ -881,6 +881,32 @@ function rebuildTray() {
 // it needs the project folder as argument.
 function loginItemOptions() {
   return app.isPackaged ? {} : { path: process.execPath, args: [ROOT] };
+}
+
+function autostartFile() {
+  return path.join(app.getPath('home'), '.config', 'autostart', 'simply-capri.desktop');
+}
+
+function autostartEnabled() {
+  if (process.platform === 'linux') return fs.existsSync(autostartFile());
+  return app.getLoginItemSettings(loginItemOptions()).openAtLogin;
+}
+
+// Linux desktops use the XDG autostart folder instead of an OS login-item API.
+function setAutostart(on) {
+  if (process.platform !== 'linux') {
+    app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: on });
+    return;
+  }
+  const file = autostartFile();
+  if (!on) {
+    fs.rmSync(file, { force: true });
+    return;
+  }
+  const exec = app.isPackaged ? process.execPath : path.join(ROOT, 'start.sh');
+  const entry = `[Desktop Entry]\nType=Application\nName=Simply Capri\nComment=Simply Capri desktop pet\nExec=${exec}\nPath=${ROOT}\nIcon=capri\nTerminal=false\nStartupNotify=false\nStartupWMClass=simply-capri\nX-GNOME-Autostart-enabled=true\nX-KDE-autostart-after=panel\nX-KDE-autostart-phase=2\n`;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, entry, 'utf8');
 }
 
 // From the tray, she says how it went; from her welcome panel (quiet), the panel does.
