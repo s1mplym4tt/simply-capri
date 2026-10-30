@@ -79,6 +79,11 @@ vision instead of pretending. DeepSeek's current `deepseek-flash` model accepts 
 `deepseek-v4-pro` model does not. There is no built-in OCR fallback yet. This works on Linux
 (X11/XWayland) as well as Windows.
 
+When the selected provider is the sxndrxnx desktop bridge, the screenshot and her answer go
+into the bot's shared turn/memory, so Discord Capri can recall what she saw. The screenshot
+is not posted to a Discord channel; only the shared memory sees it. With a direct provider
+(DeepSeek, OpenRouter, a local model), the image goes to that provider instead.
+
 ## What she does
 
 - **When she starts**: she grabs your screen. Its edges crackle red, her left hand slams onto its edge, then her

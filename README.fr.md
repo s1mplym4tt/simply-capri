@@ -43,6 +43,11 @@ semblant. Le modèle DeepSeek actuel `deepseek-flash` accepte les images ; `deep
 non. Il n'y a pas encore de secours OCR local. Cela fonctionne sous Linux
 (X11/XWayland) comme sous Windows.
 
+Quand le fournisseur choisi est le pont sxndrxnx, la capture et sa réponse entrent dans la
+mémoire partagée du bot : Capri sur Discord peut donc se rappeler ce qu'elle a vu. La capture
+n'est pas publiée dans un salon Discord ; seule la mémoire partagée la voit. Avec un
+fournisseur direct (DeepSeek, OpenRouter, un modèle local), l'image part chez ce fournisseur.
+
 ## Ce qu'elle fait
 
 - **Quand elle démarre** : elle attrape ton écran. Ses bords grésillent en rouge, sa main gauche s'abat sur le bord,

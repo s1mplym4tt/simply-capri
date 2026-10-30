@@ -11,6 +11,10 @@ Bridge contract:
 - `POST /v1/desktop/commit` — put a displayed Capri line into the shared transcript so a Discord reply continues it.
 - `GET /v1/mood` — sxndrxnx mood snapshot (`label`, `color`, `need_list`, `descriptor_words`).
 - `GET /v1/health`, `GET /v1/models` — connection checks.
+- `POST /v1/chat/completions` accepts OpenAI `image_url` content parts (including
+  `data:image/jpeg;base64,...` screenshots). The bridge passes them to the shared
+  vision pipeline and records the turn in the bot's memory, so Discord Capri sees
+  the same context. It does not post the screenshot to a Discord channel.
 
 Authentication is a bearer token from the bot's `data/desktop_bridge_token`.
 Point **Simply Capri Settings → Provider → OpenAI-compatible / OpenCode / custom** at the
