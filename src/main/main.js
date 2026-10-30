@@ -87,6 +87,14 @@ function startKWinBridge() {
   kwinBridge.on('exit', (code) => {
     if (kwinBridge) console.log('[capri] KWin bridge sink exited', code);
     kwinBridge = null;
+    // A previous app instance may still hold the bus name for its five-second
+    // parent check. Try again once it has gone.
+    if (!quitting && code === 0 && !kwinBridgeRetry) {
+      kwinBridgeRetry = setTimeout(() => {
+        kwinBridgeRetry = null;
+        startKWinBridge();
+      }, 7000);
+    }
   });
   kwinBridge.on('error', (err) => {
     console.error('[capri] KWin bridge sink failed:', err.message);
@@ -139,6 +147,7 @@ let settingsWin = null;
 let demoTimer = null;
 let windowWatch = null;
 let kwinBridge = null;
+let kwinBridgeRetry = null;
 let pointerPoll = null; // Linux: feed the overlay the real cursor while it is click-through
 let fullscreenPoll = null;
 let fullscreenState = null;
@@ -1857,6 +1866,8 @@ function main() {
     settingsWin?.destroy();
     kwinBridge?.kill();
     kwinBridge = null;
+    if (kwinBridgeRetry) clearTimeout(kwinBridgeRetry);
+    kwinBridgeRetry = null;
     globalShortcut.unregisterAll();
     windowWatch?.stop();
     if (pointerPoll) clearInterval(pointerPoll);
