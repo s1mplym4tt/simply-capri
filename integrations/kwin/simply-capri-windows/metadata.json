@@ -1,0 +1,17 @@
+{
+  "KPackageStructure": "KWin/Script",
+  "KPlugin": {
+    "Id": "simply-capri-windows",
+    "Name": "Simply Capri Window Bridge",
+    "Description": "Feeds KWin window geometry to Simply Capri so she can sit on and possess windows without Caelestia.",
+    "Version": "1.0.0",
+    "License": "MIT",
+    "EnabledByDefault": true,
+    "ServiceTypes": [
+      "KWin/Script"
+    ]
+  },
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-API": "javascript",
+  "X-Plasma-MainScript": "code/main.js"
+}

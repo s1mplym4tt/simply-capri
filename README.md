@@ -29,7 +29,7 @@ Open **Settings…** from her tray menu (or run `npm start -- --settings`). The 
 - temperature, max tokens and top-p;
 - random idle thoughts and questions, with their intervals;
 - local folder shortcuts (Claude Code working folder, app data, custom sounds, captures);
-- Home Assistant URL and access token, plus installing the Caelestia add-on (Linux/KDE) with Capri's live mood bars.
+- Home Assistant URL and access token, plus the Caelestia add-on (optional) or the native Plasma 6 applet for regular KDE.
 
 The settings window is cross-platform. The Caelestia add-on is Linux/KDE-only; on Windows the
 desktop app, chat, provider setup, generation controls, thoughts/questions and the original
@@ -38,17 +38,45 @@ Windows-only window tracking remain available.
 ## Architecture
 
 - `src/` — the Electron desktop app (this fork).
+- `integrations/kwin/` — the regular KDE/KWin window bridge (the default Linux path).
+- `integrations/plasma/` — a native Plasma 6 applet for Home Assistant and Capri's mood.
 - `integrations/caelestia/ha-widget/` — the optional Caelestia Home Assistant card, including Capri's live mood bars and return button.
-- `integrations/caelestia/capri-windows/` — the KDE/KWin window bridge that lets Capri sit on and possess native Wayland windows on Linux.
+- `integrations/caelestia/capri-windows/` — the optional Caelestia window bridge; regular KDE does not need it.
 - `integrations/sxndrxnx/` — the bridge contract for the separate sxndrxnx bot. The bot is not vendored here.
 
 The desktop app works with any OpenAI-compatible provider. The shared-memory greeting,
 thought/question and mood features are active when the provider is the sxndrxnx bridge.
 
-On Linux, window sitting and possession use the optional Caelestia/KWin bridge in
-`integrations/caelestia/capri-windows/`; without it the app still runs, but KWin's native
-Wayland windows are not visible to an XWayland client. App closing, USB events and game
-detection remain Windows-only for now.
+On Linux, the app automatically installs a KWin script and a small D-Bus sink, so window
+sitting and possession work on regular KDE Plasma 6 (Wayland or X11) without Caelestia.
+Caelestia is optional; its HA card and window bridge remain available under `integrations/`.
+On non-KDE desktops the app still runs, but has no window ledge. App closing, USB events
+and game detection remain Windows-only for now.
+
+### Regular KDE
+
+The app installs its KWin window bridge automatically on Plasma 6. Caelestia is not
+required. For the Home Assistant card, install the native Plasma applet:
+
+```bash
+kpackagetool6 --type Plasma/Applet --install integrations/plasma/capri-ha
+```
+
+Then add **Simply Capri — Home Assistant** from **Add Widgets**. The older Caelestia
+card remains available under `integrations/caelestia/ha-widget/`.
+
+## Seeing the screen
+
+Her menu has **Look at my screen**. She captures the display she is on, resizes it to a
+1280px JPEG in memory, and sends it to the current chat model as an image. On a
+vision-capable OpenAI-compatible or Ollama model she can read visible text, recognise
+windows and describe images. The capture is not written to disk by Simply Capri; it is
+sent to the provider configured in Settings, so use a local model if you want it to stay
+on your PC.
+
+Claude Code and text-only models cannot see images. For those, she says the model has no
+vision instead of pretending. There is no built-in OCR fallback yet. This works on Linux
+(X11/XWayland) as well as Windows.
 
 ## What she does
 

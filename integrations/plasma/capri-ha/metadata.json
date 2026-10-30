@@ -1,0 +1,22 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Id": "org.simplycapri.capriha",
+    "Name": "Simply Capri — Home Assistant",
+    "Description": "Home Assistant energy and Capri mood/status for KDE Plasma 6.",
+    "Icon": "applications-system",
+    "Authors": [
+      {
+        "Name": "s1mplym4tt",
+        "Email": "111281941+s1mplym4tt@users.noreply.github.com"
+      }
+    ],
+    "Version": "1.0.0",
+    "License": "MIT",
+    "Category": "System Information",
+    "ServiceTypes": [
+      "Plasma/Applet"
+    ]
+  },
+  "X-Plasma-API-Minimum-Version": "6.0"
+}

@@ -16,6 +16,32 @@ glitche, commente chaque action, vient te chercher quand elle attend ta permissi
 
 ![Téléportation, image par image](docs/teleport.png)
 
+## KDE standard et Plasma
+
+L'application installe automatiquement son pont de fenêtres KWin sur Plasma 6.
+Caelestia n'est pas nécessaire. Pour la carte Home Assistant, installe l'applet
+Plasma 6 natif :
+
+```bash
+kpackagetool6 --type Plasma/Applet --install integrations/plasma/capri-ha
+```
+
+Puis ajoute **Simply Capri — Home Assistant** depuis **Ajouter des widgets**. La
+carte Caelestia reste disponible dans `integrations/caelestia/ha-widget/`.
+
+## Voir l'écran
+
+Son menu contient **Regarder mon écran**. Elle capture l'écran où elle se trouve, le
+redimensionne en JPEG 1280 px en mémoire et l'envoie au modèle de chat comme image. Avec
+un modèle compatible OpenAI ou Ollama capable de vision, elle peut lire le texte visible,
+reconnaître les fenêtres et décrire les images. Simply Capri n'écrit pas la capture sur le
+disque ; elle part vers le fournisseur configuré dans les réglages. Utilise un modèle local
+si tu veux qu'elle reste sur ton PC.
+
+Claude Code et les modèles texte ne voient pas les images. Elle le dit au lieu de faire
+semblant. Il n'y a pas encore de secours OCR local. Cela fonctionne sous Linux
+(X11/XWayland) comme sous Windows.
+
 ## Ce qu'elle fait
 
 - **Quand elle démarre** : elle attrape ton écran. Ses bords grésillent en rouge, sa main gauche s'abat sur le bord,

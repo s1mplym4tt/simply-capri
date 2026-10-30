@@ -55,6 +55,66 @@ function migrateUserData() {
     console.error('[capri] could not migrate user data:', err.message);
   }
 }
+// Regular KDE: a KWin script sends window geometry over D-Bus to this small
+// Python sink, which writes the same /tmp/capri-windows.json format the
+// Caelestia bridge uses. No Caelestia dependency.
+function kwinBridgePaths() {
+  let source = path.join(ROOT, 'integrations', 'kwin', 'simply-capri-windows');
+  if (app.isPackaged) source = source.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
+  return {
+    source,
+    target: path.join(app.getPath('home'), '.local', 'share', 'kwin', 'scripts', 'simply-capri-windows'),
+  };
+}
+
+function hasCommand(name) {
+  try {
+    execFileSync('which', [name], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function startKWinBridge() {
+  if (process.platform !== 'linux' || kwinBridge) return;
+  let script = path.join(__dirname, 'kwin_bridge.py');
+  if (app.isPackaged) script = script.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
+  if (!fs.existsSync(script)) return;
+  kwinBridge = spawn('python3', [script, '--parent', String(process.pid)], {
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  kwinBridge.on('exit', (code) => {
+    if (kwinBridge) console.log('[capri] KWin bridge sink exited', code);
+    kwinBridge = null;
+  });
+  kwinBridge.on('error', (err) => {
+    console.error('[capri] KWin bridge sink failed:', err.message);
+    kwinBridge = null;
+  });
+}
+
+function ensureKWinBridge() {
+  if (process.platform !== 'linux') return;
+  const kde = String(process.env.XDG_CURRENT_DESKTOP || '').toLowerCase().includes('kde')
+    || fs.existsSync('/usr/bin/kwin_wayland') || fs.existsSync('/usr/bin/kwin_x11');
+  if (!kde) return;
+  const { source, target } = kwinBridgePaths();
+  if (!fs.existsSync(source)) return;
+  const kwrite = hasCommand('kwriteconfig6') ? 'kwriteconfig6' : (hasCommand('kwriteconfig5') ? 'kwriteconfig5' : null);
+  const qdbus = hasCommand('qdbus6') ? 'qdbus6' : (hasCommand('qdbus') ? 'qdbus' : null);
+  if (!kwrite || !qdbus) return;
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.cpSync(source, target, { recursive: true, force: true });
+    execFileSync(kwrite, ['--file', 'kwinrc', '--group', 'Plugins', '--key', 'simply-capri-windowsEnabled', 'true']);
+    execFileSync(qdbus, ['org.kde.KWin', '/KWin', 'reconfigure'], { stdio: 'ignore' });
+    console.log('[capri] KWin window bridge installed');
+  } catch (err) {
+    console.error('[capri] could not install KWin window bridge:', err.message);
+  }
+}
+
 const PORT = Number(process.env.CAPRI_PORT) || 47823;
 const SOUND_EXT = /\.(mp3|wav|ogg|m4a)$/i;
 
@@ -78,6 +138,7 @@ let trayMenu = null; // also what she opens when you right-click her
 let settingsWin = null;
 let demoTimer = null;
 let windowWatch = null;
+let kwinBridge = null;
 let pointerPoll = null; // Linux: feed the overlay the real cursor while it is click-through
 let fullscreenPoll = null;
 let fullscreenState = null;
@@ -1752,6 +1813,8 @@ function main() {
     createOverlay();
     createTray();
     if (process.argv.includes('--settings')) openSettings();
+    startKWinBridge();
+    ensureKWinBridge();
     windowWatch = startWindowWatch({
       overlay,
       onUpdate: (data) => {
@@ -1792,6 +1855,8 @@ function main() {
 
   app.on('will-quit', () => {
     settingsWin?.destroy();
+    kwinBridge?.kill();
+    kwinBridge = null;
     globalShortcut.unregisterAll();
     windowWatch?.stop();
     if (pointerPoll) clearInterval(pointerPoll);

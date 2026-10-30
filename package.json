@@ -1,7 +1,7 @@
 {
   "name": "simply-capri",
   "version": "0.5.0",
-  "description": "Simply Capri — a fork of Capri Desktop with unified settings, shared-memory thoughts, Spotify control and the Caelestia Home Assistant add-on.",
+  "description": "Simply Capri \u2014 a fork of Capri Desktop with unified settings, shared-memory thoughts, Spotify control and the Caelestia Home Assistant add-on.",
   "author": "mochiiwuff",
   "repository": "github:s1mplym4tt/simply-capri",
   "main": "src/main/main.js",
@@ -54,7 +54,8 @@
     "asarUnpack": [
       "hooks/**",
       "src/main/windows.ps1",
-      "integrations/**"
+      "integrations/**",
+      "src/main/kwin_bridge.py"
     ],
     "win": {
       "target": "nsis",
