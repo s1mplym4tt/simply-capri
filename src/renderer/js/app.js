@@ -221,9 +221,12 @@ async function boot() {
   capri.onMode = (mode, prev) => chip.setMode(mode, prev);
   // now and then she says something about the satellite: while she looks at it, or once
   // the red light has gone up (never during, nothing should cover that)
-  capri.onGaze = (when) => {
+  capri.onGaze = async (when) => {
     const lines = when === 'end' ? brain.t.uplink : brain.t.gaze;
-    if (!panel.visible && Math.random() < (when === 'end' ? 0.6 : 0.4)) panel.say({ kind: 'info', line: pick(lines), hold: 3800 });
+    if (panel.visible || Math.random() >= (when === 'end' ? 0.6 : 0.4)) return;
+    const fallback = pick(lines);
+    const line = await brain.eventLine('gaze', { when }, fallback);
+    if (!panel.visible) panel.say({ kind: 'info', line, hold: 3800 });
   };
   // Tell the Caelestia bridge where the interactive parts are, so its
   // full-screen drawer window can subtract a click-through hole there.
@@ -322,7 +325,7 @@ async function boot() {
   capri.onClick = () => {
     if (panel.visible) panel.hide();
     else if (!jealousy.onClick()) {
-      brain.status();
+      brain.click();
       bond.add('click', 1);
     }
   };
@@ -331,7 +334,7 @@ async function boot() {
   // loves it, once she's attached to you); twice in a row she's dizzy and fed up; three times in
   // two minutes she zaps your pointer and won't let you pick her up for a bit.
   const throws = [];
-  capri.onThrown = ({ how, hard = 0 }) => {
+  capri.onThrown = async ({ how, hard = 0 }) => {
     const t = brain.t.thrown;
     if (how === 'leap') {
       if (Math.random() < 0.4) panel.say({ kind: 'info', face: 'smug', line: pick(brain.t.screens.hello), hold: 3000 });
@@ -370,14 +373,19 @@ async function boot() {
       feel = 'thrown';
     }
     if (feel && bond.feeling !== 'angry') bond.feel(feel);
-    panel.say({ kind: 'info', face, line, hold: 3800 });
+    const shown = await brain.eventLine('throw', { how, hard, count: throws.length, feeling: feel || bond.feeling || null }, line);
+    panel.say({ kind: 'info', face, line: shown, hold: 3800 });
   };
   // you said sorry in her chat: she lets it go (and lets you pick her up again)
   bond.onCalm = () => {
     jealousy.forgive();
     capri.refuseUntil = 0;
   };
-  capri.onDodge = () => panel.say({ kind: 'info', face: 'smug', line: pick(brain.t.thrown.dodge), hold: 2500 });
+  capri.onDodge = async () => {
+    const fallback = pick(brain.t.thrown.dodge);
+    const line = await brain.eventLine('dodge', {}, fallback);
+    panel.say({ kind: 'info', face: 'smug', line, hold: 2500 });
+  };
 
   // A new stage with you: her minds come out to look at you, and she says so, the sync bar under it.
   // At a quiet moment, so it isn't missed.

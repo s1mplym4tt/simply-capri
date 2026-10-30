@@ -251,14 +251,22 @@ export class Jealousy {
   }
 
   // She saw it: she turns to it and says something. The more attached, the less she lets it go.
-  notice(key, id) {
+  async notice(key, id) {
     this.noticed[key] = Date.now();
     const stage = this.bond.stage;
     const tier = stage >= 4 ? 'high' : stage >= 2 ? 'mid' : 'low';
     const win = id && this.capri.windows.wins.find((w) => w.id === id);
     const toward = win ? Math.sign(win.x + win.w / 2 - this.capri.pos.x) || 1 : this.capri.towardCenter();
     this.capri.perform(stage >= 2 ? 'glare' : 'curious', toward);
-    this.panel.say({ kind: 'info', face: ['aside', 'aside', 'look', 'look', 'many'][stage], line: fmt(pick(this.t[tier]), { rival: RIVALS[key] }), hold: 4500 });
+    const fallback = fmt(pick(this.t[tier]), { rival: RIVALS[key] });
+    const line = await this.brain.eventLine('jealousy', {
+      rival: RIVALS[key],
+      rivalKey: key,
+      stage,
+      tier,
+      feeling: this.bond.feeling || null,
+    }, fallback);
+    this.panel.say({ kind: 'info', face: ['aside', 'aside', 'look', 'look', 'many'][stage], line, hold: 4500 });
     if (stage >= 1 && this.bond.feeling !== 'sulk') this.bond.feel('jealous', { rival: RIVALS[key] });
   }
 

@@ -412,6 +412,41 @@ export class Brain {
 
   // Fetch one click-thought in the background, from the same shared memory as
   // Discord. Clicks stay instant: use a cached thought, or her local line.
+  // One transient line from the shared bridge, with a local fallback when
+  // the bridge is not configured or takes too long.
+  async eventLine(kind, context, fallback) {
+    if (this.chatStatus?.provider !== 'custom') return fallback;
+    const res = await Promise.race([
+      this.host.presenceThought(kind, context).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (!res?.ok || !res.text) return fallback;
+    const text = String(res.text).replace(/^["“«]\s*|\s*["”»]$/g, '').trim();
+    return text || fallback;
+  }
+
+  async click() {
+    if (this.busySessions.length) {
+      this.status();
+      return;
+    }
+    const thought = this.thoughts.shift();
+    if (!thought) this.primeThought();
+    const fallback = thought || this.idleLine();
+    const line = thought || await this.eventLine('click', {
+      stage: this.bond?.stage ?? 0,
+      feeling: this.bond?.feeling || null,
+    }, fallback);
+    const talk = this.onTalk && { actions: [{ id: 'talk', label: this.t.chat.talk }], onAction: () => this.onTalk(), hold: 6000 };
+    const shown = this.say('idle', line, null, {
+      face: pick(['calm', 'smug', 'aside']),
+      ...talk,
+      hold: thought ? null : 5000,
+      ...(thought ? this.quickReply() : {}),
+    });
+    if (shown) this.commit(line);
+  }
+
   async primeThought(kind = 'thought') {
     if (this.thoughtPending) return;
     this.thoughtPending = true;

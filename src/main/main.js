@@ -1502,14 +1502,19 @@ function registerIpc() {
     }
   });
   ipcMain.handle('display:jump', (_e, options) => jumpDisplay(options || {}));
-  ipcMain.handle('presence:thought', async (_e, kind) => {
+  ipcMain.handle('presence:thought', async (_e, kind, context = {}) => {
     const cfg = config.load();
     if (cfg.provider !== 'custom') return { ok: false, reason: 'bridge' };
-    const eventKind = kind === 'question' ? 'question' : 'thought';
+    const kinds = new Set(['thought', 'question', 'jealousy', 'throw', 'click', 'dodge', 'gaze']);
+    const eventKind = kinds.has(kind) ? kind : 'thought';
     try {
       const text = await llm.desktopEvent(cfg.provider, llmConfig(cfg), {
         kind: eventKind,
-        context: { time: new Date().toLocaleString('en-GB'), lang: cfg.lang },
+        context: {
+          ...(context && typeof context === 'object' && !Array.isArray(context) ? context : {}),
+          time: new Date().toLocaleString('en-GB'),
+          lang: cfg.lang,
+        },
       });
       return text ? { ok: true, text } : { ok: false, reason: 'empty' };
     } catch (err) {

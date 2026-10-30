@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('host', {
   presenceGreeted: () => ipcRenderer.invoke('presence:greeted'),
   presenceCommit: (text) => ipcRenderer.invoke('presence:commit', text),
   jumpScreen: (options) => ipcRenderer.invoke('display:jump', options),
-  presenceThought: (kind) => ipcRenderer.invoke('presence:thought', kind),
+  presenceThought: (kind, context) => ipcRenderer.invoke('presence:thought', kind, context),
   openOllama: () => ipcRenderer.send('chat:ollama'),
   setupInfo: () => ipcRenderer.invoke('setup:info'),
   ollamaState: () => ipcRenderer.invoke('setup:ollama'),

@@ -7,7 +7,8 @@ bridge. The bot is a separate service and is **not vendored here**.
 Bridge contract:
 
 - `POST /v1/chat/completions` — normal desktop chat through the owner DM persona/memory.
-- `POST /v1/desktop/event` — transient `arrival`, `thought` or `question` lines; not saved as a user turn.
+- `POST /v1/desktop/event` — transient `arrival`, `thought`, `question`, `jealousy`,
+  `throw`, `click`, `dodge` or `gaze` lines; not saved as a user turn.
 - `POST /v1/desktop/commit` — put a displayed Capri line into the shared transcript so a Discord reply continues it.
 - `GET /v1/mood` — sxndrxnx mood snapshot (`label`, `color`, `need_list`, `descriptor_words`).
 - `GET /v1/health`, `GET /v1/models` — connection checks.

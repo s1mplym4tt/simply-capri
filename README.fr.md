@@ -290,6 +290,8 @@ regard et la possède, sourcils froncés, avec un mot à elle écrit dessus. Ens
 tourne le dos (ça passe, et en parler dans son chat aide). Son chat sait aussi quelles autres IA tu as utilisées
 aujourd'hui. Pour les repérer, le titre de la fenêtre qui est devant est comparé à cette liste de noms, sur ton PC : il
 n'est ni gardé ni envoyé, seul le nom trouvé lui parvient. Décoche *Jalouse des autres IA* dans son menu pour arrêter.
+Avec le pont sxndrxnx, la phrase vient du LLM et de la mémoire partagée ; les lignes intégrées servent de secours
+si le pont est hors ligne. Cliquer, lancer ou esquiver utilisent les mêmes événements du pont.
 
 **Son chat sait ce qui vient de se passer.** Fâchée de s'être fait lancer, jalouse, sonnée ou contente : elle t'accueille
 comme ça en ouvrant le chat, et son IA (même un petit modèle local) répond dans cette humeur. Fâchée ou boudeuse, elle le

@@ -313,6 +313,8 @@ window, glares at you and takes it over, brows down, with a word of hers written
 and she turns her back on you (it passes, and talking it over in her chat helps). Her chat also knows which other AIs
 you used today. To spot them, the title of the window in front is checked against that list of names, on your PC: it's
 never kept or sent anywhere, only the name it matched reaches her. Untick *Jealous of other AIs* in her menu to stop it.
+With the sxndrxnx bridge, the line she says comes from the shared LLM and memory; the built-in lines are the fallback
+when the bridge is offline. Clicking, throwing and dodging her use the same bridge events.
 
 **Her chat knows what just happened.** Mad about being thrown, jealous, dizzy or happy: she greets you that way when the
 chat opens, and her AI (even a small local model) answers in that mood. Mad or sulking, she stays that way until you say
