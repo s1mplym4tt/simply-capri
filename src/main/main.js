@@ -475,6 +475,8 @@ function startControlServer() {
         displayId: display.id,
         main: display.id === screen.getPrimaryDisplay().id,
         connected: config.load().provider === 'custom',
+        bounds: overlay?.getBounds() || null,
+        windows: lastWindows,
         at: Date.now(),
       });
     }

@@ -39,10 +39,16 @@ Windows-only window tracking remain available.
 
 - `src/` — the Electron desktop app (this fork).
 - `integrations/caelestia/ha-widget/` — the optional Caelestia Home Assistant card, including Capri's live mood bars and return button.
+- `integrations/caelestia/capri-windows/` — the KDE/KWin window bridge that lets Capri sit on and possess native Wayland windows on Linux.
 - `integrations/sxndrxnx/` — the bridge contract for the separate sxndrxnx bot. The bot is not vendored here.
 
 The desktop app works with any OpenAI-compatible provider. The shared-memory greeting,
 thought/question and mood features are active when the provider is the sxndrxnx bridge.
+
+On Linux, window sitting and possession use the optional Caelestia/KWin bridge in
+`integrations/caelestia/capri-windows/`; without it the app still runs, but KWin's native
+Wayland windows are not visible to an XWayland client. App closing, USB events and game
+detection remain Windows-only for now.
 
 ## What she does
 

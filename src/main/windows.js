@@ -7,6 +7,7 @@
 // is in front, if one (`game`, its folder in Steam's library or another launcher's); and the USB
 // sticks plugged in (`usb`, drive letters), and the last device plugged in or out (`plug`).
 
+const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
 const { spawn } = require('node:child_process');
@@ -16,6 +17,7 @@ const { screen } = require('electron');
 const SCRIPT = path.join(__dirname, 'windows.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 
 function startWindowWatch({ overlay, onUpdate }) {
+  if (process.platform === 'linux') return startLinuxWindowWatch({ overlay, onUpdate });
   if (process.platform !== 'win32') return { stop() {}, refresh() {} };
 
   let child = null;
@@ -73,6 +75,65 @@ function startWindowWatch({ overlay, onUpdate }) {
       child?.kill();
     },
     // her window moved (another screen, the taskbar in it or not): the same windows, from there
+    refresh: send,
+  };
+}
+
+// Caelestia exposes KWin's window list (native Wayland and XWayland) through
+// /tmp/capri-windows.json. Read it on a short timer; coordinates are global
+// desktop DIPs, so subtract the overlay's origin. Without Caelestia the file
+// simply does not exist and there is nothing to sit on.
+function startLinuxWindowWatch({ overlay, onUpdate }) {
+  const BRIDGE = '/tmp/capri-windows.json';
+  let stopped = false;
+  let last = '';
+  let timer = null;
+
+  const send = () => {
+    if (stopped || overlay.isDestroyed()) return;
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(BRIDGE, 'utf8'));
+    } catch {
+      return;
+    }
+    if (!Array.isArray(data.wins)) return;
+    const bounds = overlay.getBounds();
+    const wins = data.wins
+      .map((w) => ({
+        id: String(w.id),
+        x: Math.round(Number(w.x) - bounds.x),
+        y: Math.round(Number(w.y) - bounds.y),
+        w: Math.round(Number(w.w) || 0),
+        h: Math.round(Number(w.h) || 0),
+        max: Boolean(w.max),
+      }))
+      .filter((w) => w.id && w.w > 0 && w.h > 0
+        && w.x < bounds.width && w.x + w.w > 0
+        && w.y < bounds.height && w.y + w.h > 0);
+    const payload = {
+      fg: String(data.fg || ''),
+      taskbar: Boolean(data.taskbar),
+      ai: Array.isArray(data.ai) ? data.ai : [],
+      game: data.game || null,
+      usb: Array.isArray(data.usb) ? data.usb : [],
+      plug: data.plug || null,
+      wins,
+    };
+    const key = JSON.stringify(payload);
+    if (key === last) return;
+    last = key;
+    onUpdate(payload);
+  };
+
+  timer = setInterval(send, 500);
+  send();
+  return {
+    stop() {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      timer = null;
+    },
     refresh: send,
   };
 }

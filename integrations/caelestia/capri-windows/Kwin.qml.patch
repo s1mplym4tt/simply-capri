@@ -1,0 +1,68 @@
+--- a/services/Kwin.qml
++++ b/services/Kwin.qml
+@@ -352,8 +352,64 @@
+         ]);
+     }
+ 
++    function capriAi(win): var {
++        const text = `${win.title || ''} ${win.class || ''} ${win.resourceClass || ''}`;
++        const patterns = [
++            ['chatgpt', /chatgpt/i],
++            ['claude', /claude/i],
++            ['codex', /codex/i],
++            ['gemini', /gemini/i],
++            ['copilot', /copilot/i],
++            ['perplexity', /perplexity/i],
++            ['deepseek', /deepseek/i],
++            ['grok', /grok/i],
++            ['lechat', /le chat|mistral ai/i],
++            ['characterai', /character\.ai/i],
++            ['metaai', /meta ai/i],
++        ];
++        return patterns.filter(pair => pair[1].test(text)).map(pair => pair[0]);
++    }
++
++    readonly property string capriWindowState: JSON.stringify({
++        fg: root.activeWindow ? String(root.activeWindow.address || '') : '',
++        wins: (root.windowList || [])
++            .filter(w => !w.minimized && w.address)
++            .map(w => ({
++                id: String(w.address || ''),
++                x: Math.round(w.x || 0),
++                y: Math.round(w.y || 0),
++                w: Math.round(w.width || 0),
++                h: Math.round(w.height || 0),
++                max: Boolean(w.maximized || w.fullscreen),
++            })),
++        ai: root.activeWindow ? root.capriAi(root.activeWindow) : [],
++        taskbar: false,
++        game: null,
++        usb: [],
++        plug: null,
++    })
++
++    function writeCapriWindows(): void {
++        Quickshell.execDetached([
++            "sh", "-c", "printf '%s' \"$1\" > /tmp/capri-windows.json", "sh",
++            root.capriWindowState,
++        ]);
++    }
++
++    onCapriWindowStateChanged: writeCapriWindows()
++
++    Timer {
++        interval: 500
++        running: true
++        repeat: true
++        onTriggered: root.writeCapriWindows()
++    }
++
+     onCapriFullscreenStateChanged: writeCapriFullscreen()
+-    Component.onCompleted: writeCapriFullscreen()
++    Component.onCompleted: {
++        writeCapriFullscreen();
++        writeCapriWindows();
++    }
+ 
+     function hasWindowOverlapping(screenName: string, x: real, y: real, width: real, height: real, focusedOnly: bool): bool {
+         const wins = root.windowList;
