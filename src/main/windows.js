@@ -109,7 +109,7 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
     // and her own window. Caelestia's older format has neither, so trust it.
     const fromKWin = data.source === 'kwin-script' || data.wins.some((w) => w.cls !== undefined);
     const usable = fromKWin
-      ? data.wins.filter((w) => String(w.caption || '').trim()
+      ? data.wins.filter((w) => !w.min && String(w.caption || '').trim()
         && !/^(simply-capri|plasmashell|quickshell|kwin|xdg-desktop-portal)/i.test(String(w.cls || '')))
       : data.wins;
     const wins = usable

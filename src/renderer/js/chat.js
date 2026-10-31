@@ -26,7 +26,7 @@ const STAY_MS = 10 * 60 * 1000; // no wandering off mid-conversation
 const LOADING_AFTER_MS = 5000;
 const CLOSE_TAG = /\[\[\s*close\s*:?\s*([^\]]*)\]\]/i; // [[close: AM Music]] at the end of her answer
 // "close", "shut down", "ferme", "quitte", "cierra", "fecha", "закрой"... in any of her languages
-const CLOSE_ASK = /\b(close|shut|quit|kill|exit)|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|закр|выключ/i;
+const CLOSE_ASK = /\b(close|shut|quit|kill|exit)\b|turn (?:it )?off|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|zga[śs]|zgasi|zamknij|zamykaj|wy[lł][aą]cz|wylacz|ubij|zako[ńn]cz|zakoncz|roz[lł][aą]cz|rozlacz|zabij|закр|вимкн|выключ/i;
 // her other tags: [[open: Spotify]], [[music: Bad Bunny]], [[media: next]], [[site: youtube.com]]
 const TAG = /\[\[\s*(open|music|media|site)\s*:\s*([^\]]*)\]\]/i;
 // "open", "launch", "ouvre", "lance", "abre", "открой"... in any of her languages
@@ -286,13 +286,27 @@ export class Chat {
     this.panel.chatTurn({ quote: text, face: 'aside' });
     this.capri.pulse();
     this.onMessage?.();
-    // what you asked for plainly happens right away (the music, the volume, an app you named): her
-    // line about it comes under her answer (Claude Code, answering her chat, does things its own way)
+    // What you asked for plainly happens right away (the music, the volume, an app you named): her
+    // line about it comes under her answer (Claude Code, answering her chat, does things its own way).
+    // The open-app list must be fresh first: "close Kate" would otherwise miss an app opened after
+    // the chat panel was opened.
+    this.listApps();
+    await Promise.race([this.appsReady, new Promise((r) => setTimeout(r, 1500))]);
     const asked = this.agent ? null : this.asked(text);
     if (asked?.kind === 'look') return this.sendLook(text, id);
-    const early = asked && asked.kind !== 'close' ? this.doNow(asked) : null;
+    if (asked?.kind === 'close') {
+      // Not sent to the model: the shared sxndrxnx persona cannot see the
+      // desktop's apps and answers that it has no access. Ask here instead,
+      // and let the button close it.
+      this.turn = 0;
+      this.panel.setChatBusy(false);
+      const line = await this.offerClose(asked.name);
+      if (line) this.remember({ role: 'assistant', content: line });
+      this.listApps();
+      return;
+    }
+    const early = asked ? this.doNow(asked) : null;
     this.bond?.heard(text); // "sorry": she lets it go
-    await Promise.race([this.appsReady, new Promise((r) => setTimeout(r, 1500))]);
     // what she greeted you with (angry, sulking…), in the conversation before your message, so her
     // answer carries on from it (after another answer of hers: added to that one, never two in a row)
     if (this.opening) {
@@ -695,19 +709,26 @@ export class Chat {
     return best?.app.name || null;
   }
 
-  // She was asked to close an app: a button with its name, and nothing happens until you click it.
-  async offerClose(wanted, answer) {
+  // She was asked to close an app: a line with its name and a button, and nothing happens
+  // until you click it. `answer` is her model answer when the tag came from it; null when
+  // the request was recognised locally.
+  async offerClose(wanted, answer = null) {
     const { t } = this;
     const app = await this.host.findApp(wanted);
-    if (!this.open || this.turn) return;
+    if (!this.open || this.turn) return null;
     if (!app) {
-      this.panel.stream(`${answer}\n${fmt(t.notFound, { app: wanted })}`, { done: true });
-      return;
+      const line = fmt(t.notFound, { app: wanted });
+      this.panel.stream(answer ? `${answer}\n${line}` : line, { done: true });
+      return line;
     }
+    const ask = fmt(t.closeAsk, { app: app.name });
+    this.panel.stream(answer ? `${answer}\n${ask}` : ask, { done: true });
+    this.panel.setFace('smug');
     this.panel.setActions(
       [{ id: 'close', label: fmt(t.closeIt, { app: app.name }), primary: true }, { id: 'no', label: t.no }],
       (id) => (id === 'close' ? this.closeApp(app) : this.panel.setActions([])),
     );
+    return ask;
   }
 
   async closeApp(app, force = false) {

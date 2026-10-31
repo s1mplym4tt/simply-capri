@@ -44,7 +44,6 @@ function publish() {
         var wins = [];
         for (var i = 0; i < list.length; i++) {
             var w = list[i];
-            if (w.minimized) continue;
             var g = w.frameGeometry;
             wins.push({
                 id: windowId(w),
@@ -54,6 +53,7 @@ function publish() {
                 h: Math.round(g.height || 0),
                 pid: Number(w.pid || 0),
                 max: Boolean(w.maximized || w.fullscreen),
+                min: Boolean(w.minimized),
                 caption: String(w.caption || ""),
                 cls: String(w.resourceClass || w.windowClass || "")
             });

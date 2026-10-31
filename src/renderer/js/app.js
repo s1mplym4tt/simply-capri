@@ -281,6 +281,7 @@ async function boot() {
   const guide = new Guide({ capri, panel, voice, host, brain });
   // Talking to her (chat.js): "Talk to her" in her menu, or the button when you click her idle.
   const chat = new Chat({ capri, panel, voice, host, brain });
+  window.__chat = chat; // debug handle; harmless in production
   capri.canJump = () => !panel.visible && !guide.running && !chat.open && !brain.busySessions.length;
   brain.onTalk = () => chat.start();
   brain.onReply = (text) => chat.start(text);

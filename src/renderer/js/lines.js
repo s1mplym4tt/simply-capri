@@ -83,6 +83,7 @@ export const LINES = {
       tiny: 'Je tourne sur {model} : il est tout petit, je risque de dire n’importe quoi. On en prend un plus gros ?', better: 'Un meilleur modèle',
       working: 'Je m’en occupe… (Claude Code bosse)',
       // fermer une appli que tu lui demandes de fermer, après ton clic
+      closeAsk: 'Fermer {app} ?',
       closeIt: 'Fermer {app}', no: 'Non',
       closed: '{app} : flatliné. C’est fait.',
       stillOpen: '{app} tourne encore : il se cache dans la zone de notification, ou il te demande d’enregistrer quelque chose.',
@@ -434,6 +435,7 @@ export const LINES = {
       tiny: 'I’m running on {model}: it’s tiny, I might talk nonsense. Want a bigger one?', better: 'A better model',
       working: 'On it… (Claude Code is working)',
       // closing an app you ask her to close, after your click
+      closeAsk: 'Close {app}?',
       closeIt: 'Close {app}', no: 'No',
       closed: '{app}: flatlined. Done.',
       stillOpen: '{app} is still running: it hides in the tray, or it’s asking you to save something.',
@@ -784,6 +786,7 @@ export const LINES = {
       tiny: 'Funciono con {model}: es muy pequeño, puedo decir tonterías. ¿Cogemos uno más grande?', better: 'Un modelo mejor',
       working: 'En ello… (Claude Code está trabajando)',
       // cerrar una app que le pides cerrar, tras tu clic
+      closeAsk: '¿Cerrar {app}?',
       closeIt: 'Cerrar {app}', no: 'No',
       closed: '{app}: flatline. Hecho.',
       stillOpen: '{app} sigue abierta: se esconde en la bandeja, o te pide guardar algo.',
@@ -1133,6 +1136,7 @@ export const LINES = {
       tiny: 'Tô rodando no {model}: ele é bem pequeno, posso falar besteira. Pega um maior?', better: 'Um modelo melhor',
       working: 'Tô nessa… (o Claude Code está trabalhando)',
       // fechar um app que você pede para fechar, depois do seu clique
+      closeAsk: 'Fechar {app}?',
       closeIt: 'Fechar {app}', no: 'Não',
       closed: '{app}: flatline. Feito.',
       stillOpen: '{app} continua rodando: ele se esconde na bandeja, ou está pedindo para você salvar algo.',
@@ -1482,6 +1486,7 @@ export const LINES = {
       tiny: 'Я работаю на {model}: она совсем маленькая, могу нести чушь. Возьмём побольше?', better: 'Модель получше',
       working: 'Уже занимаюсь… (Claude Code работает)',
       // закрыть приложение, которое ты просишь закрыть, после твоего клика
+      closeAsk: 'Закрыть {app}?',
       closeIt: 'Закрыть {app}', no: 'Нет',
       closed: '{app}: флэтлайн. Готово.',
       stillOpen: '{app} всё ещё работает: прячется в трее или просит что-то сохранить.',
