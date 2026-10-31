@@ -65,6 +65,12 @@ notices another AI she now scans that window before speaking, and a full possess
 into it with her eyes, glitch slices and a line written across the frame. Those effects are
 drawn by her overlay; they do not alter the target window.
 
+Desktop interactions now also reach the shared sxndrxnx mood engine: a click grants
+`mentioned`, a rapid burst can grant `overwhelmed`, throws grant `teased`, `rejected` or
+`overwhelmed`, jealousy grants `rejected`, a dodged grab grants `teased`, and clicking on
+after she suggested rest grants `ignored`. Screen looks are full shared turns, so they
+update the same mood and memory directly.
+
 ### Regular KDE
 
 The app installs its KWin window bridge automatically on Plasma 6. Caelestia is not

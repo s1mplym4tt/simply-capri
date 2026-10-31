@@ -30,6 +30,13 @@ parler ; une possession complète plonge dedans avec ses yeux, des tranches de g
 phrase écrite sur le cadre. Ces effets sont dessinés par son overlay ; ils ne modifient pas
 la fenêtre cible.
 
+Les interactions du bureau atteignent maintenant aussi le moteur d'humeur partagé de
+sxndrxnx : un clic donne `mentioned`, une rafale peut donner `overwhelmed`, les lancers
+donnent `teased`, `rejected` ou `overwhelmed`, la jalousie donne `rejected`, une esquive
+donne `teased`, et cliquer après qu'elle a suggéré de se reposer donne `ignored`. Les
+regards sur l'écran sont de vrais tours partagés : ils mettent à jour la même humeur et
+la même mémoire.
+
 ## KDE standard et Plasma
 
 L'application installe automatiquement son pont de fenêtres KWin sur Plasma 6.

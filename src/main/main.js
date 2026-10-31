@@ -1568,6 +1568,23 @@ function registerIpc() {
     }
   });
   ipcMain.handle('display:jump', (_e, options) => jumpDisplay(options || {}));
+  ipcMain.handle('presence:mood', async (_e, event = {}) => {
+    const cfg = config.load();
+    if (cfg.provider !== 'custom' || !cfg.customUrl) return { ok: false, reason: 'bridge' };
+    const opened = llmConfig(cfg);
+    try {
+      const res = await fetch(`${cfg.customUrl.replace(/\/+$/, '')}/desktop/mood`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${opened.apiKeys?.custom || ''}`, 'content-type': 'application/json' },
+        body: JSON.stringify(event && typeof event === 'object' ? event : {}),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return { ok: false, error: `mood ${res.status}` };
+      return { ok: true, ...(await res.json()) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
   ipcMain.handle('presence:stream', async () => {
     const cfg = config.load();
     if (cfg.provider !== 'custom' || !cfg.customUrl) return { ok: false, reason: 'bridge' };

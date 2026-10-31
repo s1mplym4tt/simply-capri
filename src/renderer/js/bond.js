@@ -278,6 +278,7 @@ export class Jealousy {
       ...this.brain.quickReply(),
     });
     this.brain.commit(line);
+    this.brain.moodEvent('rejected', `saw ${RIVALS[key]} in front`, 'jealousy');
     if (stage >= 1 && this.bond.feeling !== 'sulk') this.bond.feel('jealous', { rival: RIVALS[key] });
   }
 

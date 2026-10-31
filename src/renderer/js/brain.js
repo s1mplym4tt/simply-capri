@@ -14,6 +14,10 @@ const THINK_AFTER = 15000;
 const THINK_SAY = 40000;
 const THINK_LONG = 120000;
 
+// When she suggested rest and the user keeps interacting, that is a small
+// social slight: grant the shared bot's `ignored` moodlet once.
+const REST_SUGGESTION = /\b(sleep|bed|asleep|rest|nap|dormir|duerme|descansa|sono|dorme|спать|сон|отдохни)\b/i;
+
 export class Brain {
   constructor({ capri, panel, voice, host, mission, lang = 'fr', assistant = 'claude' }) {
     this.capri = capri;
@@ -40,6 +44,7 @@ export class Brain {
     this.chatStatus = null; // provider/bridge state, for the LINK tag
     this.lastClickAt = 0;
     this.clickBurst = 0;
+    this.pendingRest = null; // a line where she suggested sleep/rest
   }
 
   get t() {
@@ -416,6 +421,11 @@ export class Brain {
   // Discord. Clicks stay instant: use a cached thought, or her local line.
   // One transient line from the shared bridge, with a local fallback when
   // the bridge is not configured or takes too long.
+  moodEvent(moodlet, reason, source = 'desktop') {
+    if (this.chatStatus?.provider !== 'custom' || !moodlet) return;
+    this.host.presenceMood({ moodlet, reason, source }).catch(() => {});
+  }
+
   async eventLine(kind, context, fallback) {
     if (this.chatStatus?.provider !== 'custom') return fallback;
     const res = await Promise.race([
@@ -436,6 +446,12 @@ export class Brain {
     const rapid = now - this.lastClickAt < 7000;
     this.lastClickAt = now;
     this.clickBurst = rapid ? this.clickBurst + 1 : 0;
+    if (this.pendingRest && now - this.pendingRest.at > 120000) {
+      this.moodEvent('ignored', 'matt kept interacting after Capri suggested rest', 'click');
+      this.pendingRest = null;
+    }
+    if (!rapid) this.moodEvent('mentioned', 'matt clicked Capri', 'click');
+    else if (this.clickBurst === 3) this.moodEvent('overwhelmed', 'matt is clicking Capri repeatedly', 'click');
     const thought = this.thoughts.shift();
     if (!thought && !rapid) this.primeThought();
     const quick = this.t.click || this.t.idle;
@@ -473,7 +489,9 @@ export class Brain {
   // Put a displayed greeting/thought into the shared transcript, so a reply
   // from either the desktop card or Discord continues the same conversation.
   commit(text) {
-    if (text) this.host.presenceCommit(text).catch(() => {});
+    if (!text) return;
+    if (REST_SUGGESTION.test(String(text))) this.pendingRest = { at: Date.now() };
+    this.host.presenceCommit(text).catch(() => {});
   }
 
   // Show a spontaneous thought/question as a replyable card. The caller

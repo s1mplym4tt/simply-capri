@@ -380,6 +380,7 @@ async function boot() {
     const shown = await brain.eventLine('throw', { how, hard, count: throws.length, feeling: feel || bond.feeling || null }, line);
     panel.say({ kind: 'info', face, line: shown, hold: null, ...brain.quickReply() });
     brain.commit(shown);
+    brain.moodEvent(feel === 'fun' ? 'teased' : feel === 'angry' ? 'rejected' : 'overwhelmed', `matt threw Capri (${how})`, 'throw');
   };
   // you said sorry in her chat: she lets it go (and lets you pick her up again)
   bond.onCalm = () => {
@@ -391,6 +392,7 @@ async function boot() {
     const line = await brain.eventLine('dodge', {}, fallback);
     panel.say({ kind: 'info', face: 'smug', line, hold: null, ...brain.quickReply() });
     brain.commit(line);
+    brain.moodEvent('teased', 'matt missed a grab', 'dodge');
   };
 
   // A new stage with you: her minds come out to look at you, and she says so, the sync bar under it.
