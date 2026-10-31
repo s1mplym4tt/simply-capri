@@ -1568,10 +1568,26 @@ function registerIpc() {
     }
   });
   ipcMain.handle('display:jump', (_e, options) => jumpDisplay(options || {}));
+  ipcMain.handle('presence:stream', async () => {
+    const cfg = config.load();
+    if (cfg.provider !== 'custom' || !cfg.customUrl) return { ok: false, reason: 'bridge' };
+    const opened = llmConfig(cfg);
+    try {
+      const res = await fetch(`${cfg.customUrl.replace(/\/+$/, '')}/discord/stream`, {
+        headers: { authorization: `Bearer ${opened.apiKeys?.custom || ''}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return { ok: false, error: `stream ${res.status}` };
+      const body = await res.json();
+      return { ok: true, streaming: Boolean(body.streaming), channel: String(body.channel || ''), guild: String(body.guild || '') };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
   ipcMain.handle('presence:thought', async (_e, kind, context = {}) => {
     const cfg = config.load();
     if (cfg.provider !== 'custom') return { ok: false, reason: 'bridge' };
-    const kinds = new Set(['thought', 'question', 'jealousy', 'throw', 'click', 'dodge', 'gaze']);
+    const kinds = new Set(['thought', 'question', 'jealousy', 'throw', 'click', 'dodge', 'gaze', 'stream']);
     const eventKind = kinds.has(kind) ? kind : 'thought';
     try {
       const text = await llm.desktopEvent(cfg.provider, llmConfig(cfg), {

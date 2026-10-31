@@ -11,6 +11,7 @@ Bridge contract:
   `throw`, `click`, `dodge` or `gaze` lines; not saved as a user turn.
 - `POST /v1/desktop/commit` — put a displayed Capri line into the shared transcript so a Discord reply continues it.
 - `GET /v1/mood` — sxndrxnx mood snapshot (`label`, `color`, `need_list`, `descriptor_words`).
+- `GET /v1/discord/stream` — the selfbot's latest Discord voice/stream state (`streaming`, `channel`, `guild`, `at`).
 - `GET /v1/health`, `GET /v1/models` — connection checks.
 - `POST /v1/chat/completions` accepts OpenAI `image_url` content parts (including
   `data:image/jpeg;base64,...` screenshots). The bridge passes them to the shared

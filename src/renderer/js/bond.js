@@ -258,6 +258,10 @@ export class Jealousy {
     const win = id && this.capri.windows.wins.find((w) => w.id === id);
     const toward = win ? Math.sign(win.x + win.w / 2 - this.capri.pos.x) || 1 : this.capri.towardCenter();
     this.capri.perform(stage >= 2 ? 'glare' : 'curious', toward);
+    if (win) {
+      const rect = () => this.capri.windows.wins.find((w) => w.id === win.id) || null;
+      this.capri.fx.scan(rect, { covers: () => this.capri.coversOf(win.id) });
+    }
     const fallback = fmt(pick(this.t[tier]), { rival: RIVALS[key] });
     const line = await this.brain.eventLine('jealousy', {
       rival: RIVALS[key],

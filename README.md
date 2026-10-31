@@ -53,6 +53,18 @@ Caelestia is optional; its HA card and window bridge remain available under `int
 On non-KDE desktops the app still runs, but has no window ledge. App closing, USB events
 and game detection remain Windows-only for now.
 
+### Streaming and window effects
+
+When she is using the sxndrxnx bridge, Capri polls the selfbot's Discord voice state. If
+you start or stop a Discord stream, she comments on it in character. This is Discord's
+`self_stream` flag only: OBS, Vice or another recorder is not treated as a stream unless it
+also changes that Discord state. The state is live-only; a bot restart starts from unknown.
+
+When she looks at a window, her frame brackets it and a red scanline sweeps it. When she
+notices another AI she now scans that window before speaking, and a full possession dives
+into it with her eyes, glitch slices and a line written across the frame. Those effects are
+drawn by her overlay; they do not alter the target window.
+
 ### Regular KDE
 
 The app installs its KWin window bridge automatically on Plasma 6. Caelestia is not

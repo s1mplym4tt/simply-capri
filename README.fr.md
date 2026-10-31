@@ -16,6 +16,20 @@ glitche, commente chaque action, vient te chercher quand elle attend ta permissi
 
 ![Téléportation, image par image](docs/teleport.png)
 
+## Streaming et effets de fenêtre
+
+Quand elle utilise le pont sxndrxnx, Capri interroge l'état vocal du selfbot Discord. Si tu
+commences ou arrêtes un stream Discord, elle le commente dans son personnage. C'est
+uniquement le drapeau `self_stream` de Discord : OBS, Vice ou un autre enregistreur ne sont
+pas considérés comme un stream sauf s'ils changent aussi cet état Discord. L'état est
+seulement en direct ; un redémarrage du bot repart d'un état inconnu.
+
+Quand elle regarde une fenêtre, ses crochets l'encadrent et une ligne de scan rouge la
+balae. Quand elle remarque une autre IA, elle scanne maintenant cette fenêtre avant de
+parler ; une possession complète plonge dedans avec ses yeux, des tranches de glitch et une
+phrase écrite sur le cadre. Ces effets sont dessinés par son overlay ; ils ne modifient pas
+la fenêtre cible.
+
 ## KDE standard et Plasma
 
 L'application installe automatiquement son pont de fenêtres KWin sur Plasma 6.

@@ -402,6 +402,37 @@ async function boot() {
   };
   const quiet = () => !capri.busy && !capri.act && !capri.dragging && !capri.stowed && !capri.dormant && !capri.hidden
     && capri.mode !== 'alert' && !chat.open && !guide.running && !panel.visible && ['stand', 'sit'].includes(capri.stance);
+  // Discord streaming status comes from the sxndrxnx selfbot's voice-state
+  // cache. Comment on start/stop only when the desktop is calm.
+  let lastStream = null;
+  const checkStream = async () => {
+    if (brain.chatStatus?.provider !== 'custom' || !quiet()) {
+      if (lastStream === null && brain.chatStatus?.provider === 'custom') {
+        const state = await host.presenceStream().catch(() => null);
+        if (state?.ok) lastStream = state.streaming;
+      }
+      return;
+    }
+    const state = await host.presenceStream().catch(() => null);
+    if (!state?.ok || typeof state.streaming !== 'boolean') return;
+    if (lastStream === state.streaming) return;
+    const was = lastStream;
+    lastStream = state.streaming;
+    if (was === null && !state.streaming) return;
+    const where = state.channel ? ` in ${state.channel}` : '';
+    const fallback = state.streaming ? `You’re live${where}, huh?` : 'Stream’s over.';
+    const line = await brain.eventLine('stream', {
+      state: state.streaming ? 'start' : 'stop',
+      channel: state.channel || '',
+      guild: state.guild || '',
+    }, fallback);
+    if (!line || !quiet()) return;
+    if (state.streaming) look.effect();
+    panel.say({ kind: 'info', face: state.streaming ? 'look' : 'smug', line, hold: null, ...brain.quickReply() });
+    brain.commit(line);
+  };
+  setInterval(checkStream, 30000);
+  checkStream();
   setInterval(async () => {
     if (!newStage || !quiet()) return;
     const stage = newStage;
