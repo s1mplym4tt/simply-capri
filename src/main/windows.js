@@ -115,12 +115,14 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
     const ai = Array.isArray(data.ai) ? data.ai.slice() : [];
     const active = wins.find((w) => w.id === String(data.fg || ''));
     if (active?.pid && processTreeHas(active.pid, 'opencode') && !ai.includes('opencode')) ai.push('opencode');
+    const game = data.game || (active?.pid ? gameForPid(active.pid) : null);
+    const usb = Array.isArray(data.usb) && data.usb.length ? data.usb : mountedRemovable();
     const payload = {
       fg: String(data.fg || ''),
       taskbar: Boolean(data.taskbar),
       ai,
-      game: data.game || null,
-      usb: Array.isArray(data.usb) ? data.usb : [],
+      game,
+      usb,
       plug: data.plug || null,
       wins,
     };
@@ -140,6 +142,37 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
     },
     refresh: send,
   };
+}
+
+// Steam games expose their install folder in the executable path. This is the
+// Linux equivalent of windows.ps1's GAME regex, without parsing titles.
+function gameForPid(pid) {
+  try {
+    const exe = fs.readlinkSync(`/proc/${pid}/exe`);
+    const m = /\/steamapps\/common\/([^/]+)\//.exec(exe);
+    if (m && !/launcher|client|redistributable|steamworks/i.test(m[1])) return m[1];
+  } catch {}
+  return null;
+}
+
+// Mounted removable media. There are no drive letters on Linux; use the mount
+// name so her "USB stick" reaction still has something to talk about.
+function mountedRemovable() {
+  const roots = [
+    path.join(os.homedir(), 'media'),
+    `/run/media/${os.userInfo().username}`,
+    '/media',
+    '/mnt',
+  ];
+  const found = new Set();
+  for (const root of roots) {
+    try {
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (entry.isDirectory()) found.add(entry.name);
+      }
+    } catch {}
+  }
+  return [...found].slice(0, 8);
 }
 
 // A TUI such as OpenCode may run inside a terminal, so the foreground window's

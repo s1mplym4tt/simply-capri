@@ -149,6 +149,7 @@ let windowWatch = null;
 let kwinBridge = null;
 let kwinBridgeRetry = null;
 let pointerPoll = null; // Linux: feed the overlay the real cursor while it is click-through
+let overlayWatchdog = null;
 let fullscreenPoll = null;
 let fullscreenState = null;
 let lastBarInset = null;
@@ -385,6 +386,47 @@ function rearmOverlay() {
 // Electron window never sees the pointer. Poll the real cursor and hand the
 // renderer its position; it can then turn interaction on when the pointer is
 // over her body or her panel, and off again when it leaves.
+// XWayland can leave her window at a doubled/off-screen coordinate after a
+// display change, a fullscreen jump or a stale window placement. Electron
+// still thinks it is on the right display, so watch the actual X11 geometry
+// and move it back onto the target display.
+function startOverlayWatchdog() {
+  if (process.platform !== 'linux' || overlayWatchdog) return;
+  overlayWatchdog = setInterval(() => {
+    if (!overlay || overlay.isDestroyed()) return;
+    try {
+      const ids = execFileSync('xdotool', ['search', '--name', '^Capri$'], { encoding: 'utf8' })
+        .trim().split(/\s+/).filter(Boolean);
+      const id = ids[ids.length - 1];
+      if (!id) return;
+      const geometry = execFileSync('xdotool', ['getwindowgeometry', '--shell', id], { encoding: 'utf8' });
+      const x = Number(/^X=(-?\d+)$/m.exec(geometry)?.[1]);
+      const y = Number(/^Y=(-?\d+)$/m.exec(geometry)?.[1]);
+      const w = Number(/^WIDTH=(\d+)$/m.exec(geometry)?.[1]);
+      const h = Number(/^HEIGHT=(\d+)$/m.exec(geometry)?.[1]);
+      if (![x, y, w, h].every(Number.isFinite)) return;
+      const all = screen.getAllDisplays();
+      const visible = all.some((d) => {
+        const b = d.bounds;
+        return x < b.x + b.width && x + w > b.x && y < b.y + b.height && y + h > b.y;
+      });
+      if (visible) {
+        // XWayland can leave the window visible but under the stack after a
+        // focus/fullscreen transition. Raising it is cheap; moving is not.
+        execFileSync('xdotool', ['windowraise', id], { stdio: 'ignore' });
+        return;
+      }
+      const target = targetDisplay().bounds;
+      execFileSync('xdotool', ['windowmove', id, String(Math.round(target.x)), String(Math.round(target.y))]);
+      execFileSync('xdotool', ['windowmap', id]);
+      overlay.showInactive();
+      console.log(`[capri] recovered off-screen overlay at ${x},${y} → ${target.x},${target.y}`);
+    } catch {
+      // xdotool missing or the window is between handles; try again next tick
+    }
+  }, 5000);
+}
+
 function startPointerPoll() {
   if (process.platform !== 'linux' || pointerPoll) return;
   pointerPoll = setInterval(() => {
@@ -1925,6 +1967,7 @@ function main() {
     serveProtocol();
     registerIpc();
     createOverlay();
+    startOverlayWatchdog();
     createTray();
     if (process.argv.includes('--settings')) openSettings();
     startKWinBridge();
@@ -1976,6 +2019,7 @@ function main() {
     globalShortcut.unregisterAll();
     windowWatch?.stop();
     if (pointerPoll) clearInterval(pointerPoll);
+    if (overlayWatchdog) clearInterval(overlayWatchdog);
     if (fullscreenPoll) clearInterval(fullscreenPoll);
     if (moodPoll) clearInterval(moodPoll);
     if (inputShape) {
