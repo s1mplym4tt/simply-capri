@@ -410,16 +410,22 @@ function startOverlayWatchdog() {
         const b = d.bounds;
         return x < b.x + b.width && x + w > b.x && y < b.y + b.height && y + h > b.y;
       });
+      const target = targetDisplay().bounds;
       if (visible) {
-        // XWayland can leave the window visible but under the stack after a
-        // focus/fullscreen transition. Raising it is cheap; moving is not.
+        // XWayland can leave the window visible but buried after a focus or
+        // fullscreen transition. Reassert the exact position, raise it, then
+        // ask KWin/Electron to keep it above the stack.
+        execFileSync('xdotool', ['windowmove', id, String(Math.round(target.x)), String(Math.round(target.y))], { stdio: 'ignore' });
         execFileSync('xdotool', ['windowraise', id], { stdio: 'ignore' });
+        overlay.setAlwaysOnTop(true, 'screen-saver');
+        overlay.moveTop();
         return;
       }
-      const target = targetDisplay().bounds;
       execFileSync('xdotool', ['windowmove', id, String(Math.round(target.x)), String(Math.round(target.y))]);
       execFileSync('xdotool', ['windowmap', id]);
       overlay.showInactive();
+      overlay.setAlwaysOnTop(true, 'screen-saver');
+      overlay.moveTop();
       console.log(`[capri] recovered off-screen overlay at ${x},${y} → ${target.x},${target.y}`);
     } catch {
       // xdotool missing or the window is between handles; try again next tick
