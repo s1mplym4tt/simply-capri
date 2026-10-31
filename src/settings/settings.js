@@ -162,11 +162,118 @@ function populate(data) {
   syncProviderUi();
 }
 
+function minutesLeft(seconds) {
+  if (!Number.isFinite(seconds)) return '';
+  const left = Math.max(0, Math.round((seconds * 1000 - Date.now()) / 60000));
+  return left <= 0 ? 'now' : `${left}m`;
+}
+
+function renderStatus(data) {
+  const bridge = Boolean(data?.bridge);
+  const mood = data?.mood;
+  const stream = data?.stream;
+  const offline = Boolean(mood?.offline) || !bridge;
+  setBadge('status-badge', !bridge ? 'not configured' : (offline ? 'bridge offline' : 'live'), offline ? 'bad' : 'ok');
+
+  const dot = $('mood-dot');
+  dot.style.background = mood?.color || 'var(--muted)';
+  dot.style.color = mood?.color || 'transparent';
+  $('mood-label').textContent = mood?.enabled === false ? 'Mood disabled'
+    : (mood?.label || mood?.emotion || '—');
+  $('mood-intensity').textContent = mood?.intensity
+    ? `level ${mood.level ?? '·'} · intensity ${mood.intensity}`
+    : (mood?.descriptors || '');
+  $('mood-meaning').textContent = mood?.meaning || '';
+
+  const needs = Array.isArray(mood?.need_list) ? mood.need_list : [];
+  const meters = $('mood-needs');
+  meters.replaceChildren();
+  for (const need of needs) {
+    const value = Math.round((Number(need.value) || 0) * 100);
+    const row = document.createElement('div');
+    row.className = 'meter';
+    const label = document.createElement('span');
+    label.textContent = need.label || need.key;
+    const bar = document.createElement('div');
+    bar.className = 'meter__bar';
+    const fill = document.createElement('div');
+    fill.className = `meter__fill${need.low ? ' low' : ''}`;
+    fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
+    bar.append(fill);
+    const amount = document.createElement('span');
+    amount.className = 'meter__value';
+    amount.textContent = `${value}%`;
+    row.append(label, bar, amount);
+    meters.append(row);
+  }
+
+  const state = $('stream-state');
+  if (stream?.streaming) {
+    state.textContent = 'live';
+    state.className = 'on';
+  } else if (data?.streamError) {
+    state.textContent = 'error';
+    state.className = 'off';
+    state.title = data.streamError;
+  } else {
+    state.textContent = 'off';
+    state.className = 'off';
+  }
+  $('stream-channel').textContent = stream?.channel
+    ? `${stream.guild ? `${stream.guild} / ` : ''}#${stream.channel}`
+    : '—';
+  $('bridge-state').textContent = data?.url || 'not configured';
+  $('bridge-state').title = data?.url || '';
+
+  const wrap = $('moodlets');
+  wrap.replaceChildren();
+  const moodlets = Array.isArray(mood?.moodlets) ? mood.moodlets.slice(0, 8) : [];
+  if (!moodlets.length) {
+    const empty = document.createElement('p');
+    empty.className = 'note empty';
+    empty.textContent = bridge ? 'No active moodlets.' : 'The shared bridge is not configured yet.';
+    wrap.append(empty);
+  } else {
+    for (const moodlet of moodlets) {
+      const row = document.createElement('div');
+      row.className = 'moodlet-row';
+      const copy = document.createElement('div');
+      copy.className = 'moodlet-copy';
+      const title = document.createElement('strong');
+      title.textContent = moodlet.label || moodlet.id || 'moodlet';
+      const reason = document.createElement('small');
+      reason.textContent = moodlet.reason || moodlet.description || '';
+      copy.append(title, reason);
+      const when = document.createElement('span');
+      when.className = 'moodlet-when';
+      when.textContent = minutesLeft(Number(moodlet.expires_at));
+      row.append(copy, when);
+      wrap.append(row);
+    }
+  }
+
+  $('status-updated').textContent = data?.at
+    ? `Updated ${new Date(data.at).toLocaleTimeString()}${mood?.offline ? ' · the bridge did not answer' : ''}`
+    : '';
+}
+
+let statusTimer = null;
+async function refreshStatus() {
+  try {
+    renderStatus(await api.status());
+  } catch (err) {
+    setBadge('status-badge', 'unreachable', 'bad');
+    $('status-updated').textContent = `Could not read the bridge: ${err.message}`;
+  }
+}
+
 async function load() {
   setStatus('Loading…');
   try {
     populate(await api.get());
     setStatus('');
+    await refreshStatus();
+    if (!statusTimer) statusTimer = setInterval(refreshStatus, 10000);
   } catch (err) {
     setStatus(`Could not load settings: ${err.message}`, 'bad');
   }
@@ -311,6 +418,8 @@ $('temperature').addEventListener('input', () => {
 });
 $('save').addEventListener('click', save);
 $('refresh').addEventListener('click', refresh);
+$('status-refresh').addEventListener('click', refreshStatus);
+window.addEventListener('beforeunload', () => clearInterval(statusTimer));
 $('saveHa').addEventListener('click', saveHa);
 $('pickClaude').addEventListener('click', pickClaude);
 $('installHa').addEventListener('click', installHa);

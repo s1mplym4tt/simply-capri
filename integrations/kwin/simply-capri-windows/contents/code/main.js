@@ -53,7 +53,9 @@ function publish() {
                 w: Math.round(g.width || 0),
                 h: Math.round(g.height || 0),
                 pid: Number(w.pid || 0),
-                max: Boolean(w.maximized || w.fullscreen)
+                max: Boolean(w.maximized || w.fullscreen),
+                caption: String(w.caption || ""),
+                cls: String(w.resourceClass || w.windowClass || "")
             });
         }
         var data = {

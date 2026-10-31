@@ -176,6 +176,56 @@ button.link { border: 0; padding: 0; background: none; color: var(--accent-2); t
 button.small { padding: 7px 11px; font-size: 12px; }
 .empty { color: var(--muted); font-style: italic; }
 
+/* live mood / stream read-out */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+}
+.mood-head { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.mood-head strong { font-size: 17px; }
+.mood-dot {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 12px currentColor;
+}
+.mood-intensity { margin-left: auto; color: var(--muted); font: 11px "JetBrains Mono", ui-monospace, monospace; }
+.meters { display: grid; gap: 8px; margin-top: 14px; }
+.meter {
+  display: grid;
+  grid-template-columns: 76px 1fr 36px;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.meter__bar { height: 7px; background: rgba(255, 255, 255, .07); border: 1px solid var(--line); overflow: hidden; }
+.meter__fill { height: 100%; background: var(--accent); }
+.meter__fill.low { background: var(--red); }
+.meter__value { text-align: right; font: 11px "JetBrains Mono", ui-monospace, monospace; }
+.status-line { display: flex; justify-content: space-between; gap: 14px; margin: 7px 0; color: var(--ink); }
+.status-key { color: var(--muted); }
+.status-line .on { color: var(--green); }
+.status-line .off { color: var(--muted); }
+.small-head { align-items: center; margin: 20px 0 4px; }
+.small-head h3 { margin: 0; font-size: 15px; color: var(--ink); }
+.moodlet-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.moodlet-row:last-child { border-bottom: 0; }
+.moodlet-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.moodlet-copy strong { color: var(--ink); }
+.moodlet-copy small { color: var(--muted); line-height: 1.4; }
+.moodlet-when { flex: none; color: var(--muted); font: 11px "JetBrains Mono", ui-monospace, monospace; }
+
 @media (max-width: 720px) {
   .top, main, .credit { padding-left: 18px; padding-right: 18px; }
   .credit { margin-left: 18px; margin-right: 18px; }

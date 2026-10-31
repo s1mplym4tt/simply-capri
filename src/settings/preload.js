@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('capriSettings', {
   get: () => ipcRenderer.invoke('settings:get'),
   save: (data) => ipcRenderer.invoke('settings:save', data),
   refresh: () => ipcRenderer.invoke('settings:refresh'),
+  status: () => ipcRenderer.invoke('status:now'),
   clearKey: (provider) => ipcRenderer.invoke('settings:clear-key', provider),
   pickClaude: () => ipcRenderer.invoke('settings:pick-claude'),
   openPath: (kind) => ipcRenderer.invoke('settings:open-path', kind),

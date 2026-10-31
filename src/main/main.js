@@ -113,11 +113,29 @@ function ensureKWinBridge() {
   const qdbus = hasCommand('qdbus6') ? 'qdbus6' : (hasCommand('qdbus') ? 'qdbus' : null);
   if (!kwrite || !qdbus) return;
   try {
+    const sourceFile = path.join(source, 'contents', 'code', 'main.js');
+    const targetFile = path.join(target, 'contents', 'code', 'main.js');
+    let changed = true;
+    try {
+      changed = fs.readFileSync(sourceFile, 'utf8') !== fs.readFileSync(targetFile, 'utf8');
+    } catch {
+      changed = true;
+    }
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.cpSync(source, target, { recursive: true, force: true });
-    execFileSync(kwrite, ['--file', 'kwinrc', '--group', 'Plugins', '--key', 'simply-capri-windowsEnabled', 'true']);
-    execFileSync(qdbus, ['org.kde.KWin', '/KWin', 'reconfigure'], { stdio: 'ignore' });
-    console.log('[capri] KWin window bridge installed');
+    const setEnabled = (on) => {
+      execFileSync(kwrite, ['--file', 'kwinrc', '--group', 'Plugins', '--key', 'simply-capri-windowsEnabled', on ? 'true' : 'false']);
+      execFileSync(qdbus, ['org.kde.KWin', '/KWin', 'reconfigure'], { stdio: 'ignore' });
+    };
+    if (changed) {
+      // KWin keeps the loaded plugin's old code until it is disabled and enabled
+      // again; a reconfigure alone is not enough after an update.
+      setEnabled(false);
+      setEnabled(true);
+    } else {
+      setEnabled(true);
+    }
+    console.log(`[capri] KWin window bridge installed${changed ? ' (reloaded)' : ''}`);
   } catch (err) {
     console.error('[capri] could not install KWin window bridge:', err.message);
   }
@@ -575,6 +593,22 @@ async function refreshMood() {
   }
 }
 
+async function fetchStream(cfg = config.load()) {
+  const opened = llmConfig(cfg);
+  const res = await fetch(`${cfg.customUrl.replace(/\/+$/, '')}/discord/stream`, {
+    headers: { authorization: `Bearer ${opened.apiKeys?.custom || ''}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`stream ${res.status}`);
+  const body = await res.json();
+  return {
+    streaming: Boolean(body.streaming),
+    channel: String(body.channel || ''),
+    guild: String(body.guild || ''),
+    at: String(body.at || ''),
+  };
+}
+
 function startMoodPoll() {
   if (moodPoll) return;
   refreshMood();
@@ -614,6 +648,8 @@ function startControlServer() {
           if (action === 'jump') return send(200, jumpDisplay({}));
           if (action === 'status') { sendCommand('status'); return send(200, { ok: true }); }
           if (action === 'talk') { sendCommand('chat'); return send(200, { ok: true }); }
+          if (action === 'settings') { openSettings(); return send(200, { ok: true }); }
+          if (action === 'nudge') { sendCommand('nudge'); return send(200, { ok: true }); }
           if (action === 'mood') { sendCommand('mood', { mood: String(data.mood || 'idle') }); return send(200, { ok: true }); }
           if (action === 'media') {
             launch.media(String(data.media || 'pause')).then((ok) => send(200, { ok }), (err) => send(200, { ok: false, error: err.message }));
@@ -1640,18 +1676,28 @@ function registerIpc() {
   ipcMain.handle('presence:stream', async () => {
     const cfg = config.load();
     if (cfg.provider !== 'custom' || !cfg.customUrl) return { ok: false, reason: 'bridge' };
-    const opened = llmConfig(cfg);
     try {
-      const res = await fetch(`${cfg.customUrl.replace(/\/+$/, '')}/discord/stream`, {
-        headers: { authorization: `Bearer ${opened.apiKeys?.custom || ''}` },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) return { ok: false, error: `stream ${res.status}` };
-      const body = await res.json();
-      return { ok: true, streaming: Boolean(body.streaming), channel: String(body.channel || ''), guild: String(body.guild || '') };
+      return { ok: true, ...(await fetchStream(cfg)) };
     } catch (err) {
       return { ok: false, error: err.message };
     }
+  });
+  // The Settings panel's live read-out: the same bridge data the overlay uses.
+  ipcMain.handle('status:now', async () => {
+    const cfg = config.load();
+    const at = Date.now();
+    if (cfg.provider !== 'custom' || !cfg.customUrl) {
+      return { ok: false, bridge: false, mood: null, stream: null, at };
+    }
+    await refreshMood();
+    let stream = null;
+    let streamError = '';
+    try {
+      stream = await fetchStream(cfg);
+    } catch (err) {
+      streamError = err.message;
+    }
+    return { ok: true, bridge: true, url: cfg.customUrl, mood: capriMood, stream, streamError, at };
   });
   ipcMain.handle('presence:thought', async (_e, kind, context = {}) => {
     const cfg = config.load();

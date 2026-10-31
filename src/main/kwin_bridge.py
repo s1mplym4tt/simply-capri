@@ -21,7 +21,9 @@ from gi.repository import GLib
 BUS_NAME = "org.simplycapri.Windows"
 OBJECT_PATH = "/org/simplycapri/Windows"
 INTERFACE = "org.simplycapri.Windows"
-TARGET = "/tmp/capri-windows.json"
+# Caelestia (optional) also writes /tmp/capri-windows.json. Keep the regular
+# KDE bridge's snapshot separate so the two cannot overwrite each other.
+TARGET = "/tmp/capri-windows-kwin.json"
 
 
 class WindowSink(dbus.service.Object):

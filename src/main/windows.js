@@ -81,26 +81,38 @@ function startWindowWatch({ overlay, onUpdate }) {
 }
 
 // Caelestia exposes KWin's window list (native Wayland and XWayland) through
-// /tmp/capri-windows.json. Read it on a short timer; coordinates are global
-// desktop DIPs, so subtract the overlay's origin. Without Caelestia the file
-// simply does not exist and there is nothing to sit on.
+// snapshots. The regular KDE bridge writes /tmp/capri-windows-kwin.json; the
+// optional Caelestia integration writes /tmp/capri-windows.json. Prefer ours,
+// fall back to Caelestia. Coordinates are global desktop DIPs, so subtract the
+// overlay's origin.
 function startLinuxWindowWatch({ overlay, onUpdate }) {
-  const BRIDGE = '/tmp/capri-windows.json';
+  const BRIDGES = ['/tmp/capri-windows-kwin.json', '/tmp/capri-windows.json'];
   let stopped = false;
   let last = '';
   let timer = null;
 
   const send = () => {
     if (stopped || overlay.isDestroyed()) return;
-    let data;
-    try {
-      data = JSON.parse(fs.readFileSync(BRIDGE, 'utf8'));
-    } catch {
-      return;
+    let data = null;
+    for (const file of BRIDGES) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (Array.isArray(parsed.wins)) {
+          data = parsed;
+          break;
+        }
+      } catch {}
     }
-    if (!Array.isArray(data.wins)) return;
+    if (!data) return;
     const bounds = overlay.getBounds();
-    const wins = data.wins
+    // The KWin bridge carries captions and classes: skip panels, the compositor
+    // and her own window. Caelestia's older format has neither, so trust it.
+    const fromKWin = data.source === 'kwin-script' || data.wins.some((w) => w.cls !== undefined);
+    const usable = fromKWin
+      ? data.wins.filter((w) => String(w.caption || '').trim()
+        && !/^(simply-capri|plasmashell|quickshell|kwin|xdg-desktop-portal)/i.test(String(w.cls || '')))
+      : data.wins;
+    const wins = usable
       .map((w) => ({
         id: String(w.id),
         x: Math.round(Number(w.x) - bounds.x),
@@ -114,7 +126,11 @@ function startLinuxWindowWatch({ overlay, onUpdate }) {
         && w.x < bounds.width && w.x + w.w > 0
         && w.y < bounds.height && w.y + w.h > 0);
     const ai = Array.isArray(data.ai) ? data.ai.slice() : [];
-    const active = wins.find((w) => w.id === String(data.fg || ''));
+    // The foreground window can be on another monitor, where `wins` (her screen
+    // only) does not contain it. Read it from the raw snapshot so a game or an
+    // OpenCode session there still registers.
+    const active = (Array.isArray(data.wins) ? data.wins : [])
+      .find((w) => String(w.id) === String(data.fg || ''));
     if (active?.pid && processTreeHas(active.pid, 'opencode') && !ai.includes('opencode')) ai.push('opencode');
     const game = data.game || (active?.pid ? gameForPid(active.pid) : null);
     const usb = Array.isArray(data.usb) && data.usb.length ? data.usb : mountedRemovable();

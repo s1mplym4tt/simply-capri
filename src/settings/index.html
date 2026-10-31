@@ -79,7 +79,42 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">03 // GENERATION</p>
+          <p class="eyebrow">03 // SHARED STATE</p>
+          <h2>Mood and Discord stream</h2>
+        </div>
+        <span id="status-badge" class="badge">checking</span>
+      </div>
+
+      <div class="status-grid">
+        <div>
+          <div class="mood-head">
+            <span id="mood-dot" class="mood-dot"></span>
+            <strong id="mood-label">—</strong>
+            <span id="mood-intensity" class="mood-intensity"></span>
+          </div>
+          <p id="mood-meaning" class="note"></p>
+          <div id="mood-needs" class="meters"></div>
+        </div>
+        <div>
+          <p class="status-line"><span class="status-key">Discord stream</span><span id="stream-state">—</span></p>
+          <p class="status-line"><span class="status-key">Channel</span><span id="stream-channel">—</span></p>
+          <p class="status-line"><span class="status-key">Bridge</span><span id="bridge-state">—</span></p>
+        </div>
+      </div>
+
+      <div class="section-head small-head">
+        <h3>Active moodlets</h3>
+        <button id="status-refresh" class="secondary small">Refresh</button>
+      </div>
+      <div id="moodlets" class="list"></div>
+      <p id="status-updated" class="note"></p>
+      <p class="note">Live read-out from sxndrxnx: the same mood and stream state her desktop reactions use.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">04 // GENERATION</p>
           <h2>How she answers</h2>
         </div>
       </div>
@@ -106,7 +141,7 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">04 // MIND</p>
+          <p class="eyebrow">05 // MIND</p>
           <h2>Thoughts and questions</h2>
         </div>
       </div>
@@ -145,7 +180,7 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">05 // PATHS</p>
+          <p class="eyebrow">06 // PATHS</p>
           <h2>Folders</h2>
         </div>
       </div>
@@ -180,7 +215,7 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">06 // CAELESTIA</p>
+          <p class="eyebrow">07 // CAELESTIA</p>
           <h2>Home Assistant + mood add-on</h2>
         </div>
         <span id="ha-badge" class="badge">unknown</span>
@@ -217,7 +252,7 @@
     </section>
 
     <section class="card about">
-      <p class="eyebrow">07 // CREDITS</p>
+      <p class="eyebrow">08 // CREDITS</p>
       <h2>Simply Capri · built on Capri Desktop</h2>
       <p>
         Original Capri Desktop by <strong>mochiiwuff</strong> ·
