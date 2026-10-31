@@ -38,6 +38,8 @@ export class Brain {
     this.questions = [];    // unused cache for random questions
     this.thoughtPending = false;
     this.chatStatus = null; // provider/bridge state, for the LINK tag
+    this.lastClickAt = 0;
+    this.clickBurst = 0;
   }
 
   get t() {
@@ -430,13 +432,18 @@ export class Brain {
       this.status();
       return;
     }
+    const now = performance.now();
+    const rapid = now - this.lastClickAt < 7000;
+    this.lastClickAt = now;
+    this.clickBurst = rapid ? this.clickBurst + 1 : 0;
     const thought = this.thoughts.shift();
-    if (!thought) this.primeThought();
-    const fallback = thought || this.idleLine();
-    const line = thought || await this.eventLine('click', {
+    if (!thought && !rapid) this.primeThought();
+    const quick = this.t.click || this.t.idle;
+    const fallback = thought || (rapid ? pick(quick) : this.idleLine());
+    const line = thought || (rapid ? fallback : await this.eventLine('click', {
       stage: this.bond?.stage ?? 0,
       feeling: this.bond?.feeling || null,
-    }, fallback);
+    }, fallback));
     const talk = this.onTalk && { actions: [{ id: 'talk', label: this.t.chat.talk }], onAction: () => this.onTalk(), hold: 6000 };
     const shown = this.say('idle', line, null, {
       face: pick(['calm', 'smug', 'aside']),

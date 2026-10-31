@@ -21,7 +21,7 @@ const DEFAULTS = {
   apiKeys: {},       // { openai: 'sk-...' }, else the provider's env variable
   customUrl: '',     // the 'custom' provider: any OpenAI-compatible base URL (http://host:port/v1)
   temperature: 0.8,  // chat generation settings for OpenAI-compatible providers
-  maxTokens: 800,
+  maxTokens: 2000,
   topP: 1,
   randomThoughts: true,  // occasional idle thoughts from the shared bot
   randomThoughtMinutes: 15,
