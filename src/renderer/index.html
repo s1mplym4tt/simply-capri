@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="styles/capri.css">
 </head>
 <body>
+  <!-- One opaque pixel keeps the otherwise fully transparent X11 window
+       presentable: Chromium drops frames when every pixel is transparent,
+       which left the overlay invisible until something opaque was drawn. -->
+  <div class="paint-nudge" aria-hidden="true"></div>
+
   <div id="capri" class="capri">
     <canvas id="sprite" class="capri__sprite" aria-label="Capri"></canvas>
   </div>

@@ -419,6 +419,9 @@ function startOverlayWatchdog() {
         execFileSync('xdotool', ['windowraise', id], { stdio: 'ignore' });
         overlay.setAlwaysOnTop(true, 'screen-saver');
         overlay.moveTop();
+        // A fully transparent frame can be dropped before it reaches X11;
+        // this wakes the renderer without disturbing anything visible.
+        sendCommand('nudge');
         return;
       }
       execFileSync('xdotool', ['windowmove', id, String(Math.round(target.x)), String(Math.round(target.y))]);
@@ -426,6 +429,7 @@ function startOverlayWatchdog() {
       overlay.showInactive();
       overlay.setAlwaysOnTop(true, 'screen-saver');
       overlay.moveTop();
+      sendCommand('nudge');
       console.log(`[capri] recovered off-screen overlay at ${x},${y} → ${target.x},${target.y}`);
     } catch {
       // xdotool missing or the window is between handles; try again next tick

@@ -97,6 +97,19 @@ body {
   display: none !important;
 }
 
+/* The opaque pixel from index.html. Invisible in practice, but it keeps at
+   least one non-transparent pixel in every frame so X11/KWin presents it. */
+.paint-nudge {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 1px;
+  height: 1px;
+  background: #000;
+  pointer-events: none;
+}
+
 /* ---------- Capri ---------- */
 
 .capri {

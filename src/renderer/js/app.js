@@ -18,6 +18,17 @@ import { pick, fmt, reducedMotion } from './util.js';
 
 const host = window.host;
 
+// X11/Chromium can leave a fully transparent window unpresented. Moving the
+// 1px opaque element forces a real frame; it also brings her back if the
+// surface ever stalls while running, without needing a restart.
+let nudgeFlip = false;
+function nudgePaint() {
+  const dot = document.querySelector('.paint-nudge');
+  if (!dot) return;
+  nudgeFlip = !nudgeFlip;
+  dot.style.transform = nudgeFlip ? 'translateX(1px)' : 'translateX(0)';
+}
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -751,6 +762,9 @@ async function boot() {
       case 'status':
         brain.status();
         break;
+      case 'nudge': // X11 dropped a frame because the window was fully transparent
+        nudgePaint();
+        break;
       case 'jumpScreen': {
         let tries = 0;
         const go = async () => {
@@ -918,6 +932,9 @@ async function boot() {
   if (config.visible === false) capri.stowNow();
   else if (intro) await capri.intro(capri.spot('post'));
   else await capri.materialize(capri.spot('post'));
+  // once she is on screen, make sure the first frames are actually presented
+  setTimeout(nudgePaint, 600);
+  setTimeout(nudgePaint, 2500);
   // Windows has its animations off and she's following it: she barely moves. The first time, she
   // says so and asks whether to move anyway (her menu › Animations changes it later).
   if (reducedMotion.setting === 'auto' && reducedMotion.system && !config.motionAsked) {
