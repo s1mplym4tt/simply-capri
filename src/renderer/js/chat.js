@@ -735,7 +735,7 @@ export class Chat {
     this.listApps();
   }
 
-  // What she can do on the PC when you ask (Windows), and nothing else.
+  // What she can do on the PC when you ask (Windows and KDE/Linux), and nothing else.
   powers() {
     const lines = [
       'Only when the user asks you to open an app, a game, a file or folder on their desktop, or a folder like Downloads, to play something on Spotify, to control the music playing, or to open a website: say in a few words that you will, and end your answer with one tag: [[open: NAME]], [[music: WHAT TO PLAY]] (Spotify on this PC; if they did not say which song, pick one that fits), [[media: ACTION]] (ACTION: pause, play, next, previous, volup, voldown or mute), or [[site: ADDRESS]]. Some of these get a button to confirm, so never say it is already done. You do have access to Spotify on this PC: never claim you do not have Spotify or cannot control it. Any other time, write no tag at all: there are no other tags.',

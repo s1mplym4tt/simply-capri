@@ -43,7 +43,9 @@ function run(command, args, timeout = 8000) {
 
 function display(key) {
   if (!key) return '';
-  return key.charAt(0).toUpperCase() + key.slice(1);
+  // Wayland app ids look like "org.kde.kdialog", "org.mozilla.firefox"
+  const base = String(key).includes('.') ? String(key).split('.').pop() : String(key);
+  return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
