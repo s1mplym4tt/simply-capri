@@ -8,6 +8,7 @@
 // sticks plugged in (`usb`, drive letters), and the last device plugged in or out (`plug`).
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline');
 const { spawn } = require('node:child_process');
