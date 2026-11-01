@@ -238,8 +238,11 @@ export class Capri {
     this.place();
   }
 
-  // Hop the whole overlay to another monitor, then settle on its floor.
-  async jumpScreen(options = {}) {
+  // Hop the whole overlay to another monitor, then settle on its floor. Main picks the screen
+  // (`{ force, returnTo }`): the next one, or back where a fullscreen app pushed her from.
+  // `jumpScreen` below is the animated, screen-aware one; this is the plain fallback it uses
+  // when its caller hands it display options instead of a `go` callback.
+  async hopToDisplay(options = {}) {
     if (!this.host?.jumpScreen || this.stowed || this.busy || this.dragging || this.dormant) return false;
     if (!options.force && this.canJump && !this.canJump()) return false;
     const res = await this.host.jumpScreen(options).catch(() => null);
@@ -2312,13 +2315,17 @@ export class Capri {
   // To a screen that isn't right next to hers (or picked in her menu): she leaves in her column of
   // light, `go` moves her window (and resolves with the pointer, as seen from there), and she comes
   // down over there: next to the pointer if it's there, else in her corner.
+  // Her menu and a fullscreen app hand in display options ({ force, returnTo }) instead: main
+  // picks the screen then, and she hops there the plain way.
   async jumpScreen(go, { toPointer = false } = {}) {
+    if (typeof go !== 'function') return this.hopToDisplay(go || {});
     if (this.stowed) {
       await go(); // put away: her biochip just goes along with her window
       return;
     }
     if (this.dormant) await this.rouse();
     for (let i = 0; (this.busy || this.dragging) && i < 40; i++) await sleep(100);
+    if (this.busy || this.dragging) return false;
     this.busy = true;
     this.wake();
     this.onTeleport?.('start');
@@ -2326,13 +2333,22 @@ export class Capri {
     this.root.hidden = true;
     this.fx.clear();
     this.setStance('stand');
-    const cursor = await go().catch(() => null);
-    this.root.hidden = this.hidden;
-    const near = toPointer && cursor?.inside;
-    const to = near ? this.summonSpot(cursor) : this.spot('post');
-    await this.arrive(to, { face: near ? (cursor.x < to.x ? 1 : -1) : null });
-    await this.settle();
-    return cursor;
+    try {
+      const cursor = await go().catch(() => null);
+      this.root.hidden = this.hidden;
+      const near = toPointer && cursor?.inside;
+      const to = near ? this.summonSpot(cursor) : this.spot('post');
+      await this.arrive(to, { face: near ? (cursor.x < to.x ? 1 : -1) : null });
+      await this.settle();
+      return cursor;
+    } finally {
+      // A move that fails halfway must not leave her invisible and stuck for good.
+      if (this.root.hidden && !this.hidden) this.root.hidden = false;
+      if (this.busy) {
+        this.busy = false;
+        this.onTeleport?.('end');
+      }
+    }
   }
 
   // ---------- your PC (pc.js) ----------
