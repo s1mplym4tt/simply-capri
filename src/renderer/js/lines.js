@@ -772,6 +772,7 @@ export const LINES = {
       noteTag: 'AI',
       note: 'Odpowiedzi generuje lokalna AI. To nie prawdziwa Capri.',
       noteCloud: 'Odpowiedzi generuje AI w chmurze. To nie prawdziwa Capri.',
+      shared: 'Połączono z sxndrxnx · ta sama pamięć co na Discordzie.', desktopBadge: 'PULPIT',
       offline: 'Nie mogę połączyć się z Ollamą.',
       offlineHow: 'Żeby ze mną pogadać, zainstaluj Ollamę (ollama.com) i uruchom ją, a potem w terminalu: ollama pull llama3.2\nWszystko zostaje na twoim PC.',
       noModel: 'Ollama nie ma jeszcze modelu.',

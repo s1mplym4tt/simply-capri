@@ -235,7 +235,7 @@ export class Chat {
     const shown = this.panel.say({
       kind: 'chat',
       face: moody ? MOOD_FACE[feeling] : 'look',
-      badge: shared ? 'DESKTOP' : t.badge,
+      badge: shared ? (t.desktopBadge || 'DESKTOP') : t.badge,
       tag: shared ? 'LINK · sxndrxnx' : shortModel,
       desktop: shared,
       line: tiny ? fmt(t.tiny, { model: shortModel }) : hello,
@@ -249,7 +249,7 @@ export class Chat {
         send: t.send,
         close: t.close,
         noteTag: shared ? 'LINK' : t.noteTag,
-        note: shared ? 'Connected to sxndrxnx · same memory as Discord.' : (status.local ? t.note : t.noteCloud),
+        note: shared ? (t.shared || 'Connected to sxndrxnx · same memory as Discord.') : (status.local ? t.note : t.noteCloud),
       },
       onSend: (text) => this.send(text),
       onLeave: () => this.close(),

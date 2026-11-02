@@ -389,7 +389,7 @@ export class Brain {
   // The little line under a reply card: make the shared bridge visible.
   linkNote() {
     if (this.chatStatus?.provider === 'custom') {
-      return { noteTag: 'LINK', note: 'sxndrxnx · shared memory with Discord' };
+      return { noteTag: 'LINK', note: this.t.chat.shared || 'sxndrxnx · shared memory with Discord' };
     }
     return { noteTag: this.t.chat.noteTag, note: this.t.chat.note };
   }
